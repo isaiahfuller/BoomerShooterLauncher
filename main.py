@@ -165,9 +165,14 @@ class MainWindow(QtWidgets.QMainWindow):
                     run_path = os.path.join(run[1], self.game_list.game)
                     os.makedirs(run_path, exist_ok=True)
                 if self.runner_text == "GZDoom":
-                    os.rename(os.path.join(run[1],"Save"), os.path.join(run[1],".Save"))
-                    os.makedirs(os.path.join(run[1], self.game_list.game), exist_ok=True)
-                    os.rename(os.path.join(run[1], self.game_list.game), os.path.join(run[1],"Save"))
+                    for retry in range(100):
+                        try:
+                            os.rename(os.path.join(run[1],"Save"), os.path.join(run[1],".Save"))
+                            os.makedirs(os.path.join(run[1], self.game_list.game), exist_ok=True)
+                            os.rename(os.path.join(run[1], self.game_list.game), os.path.join(run[1],"Save"))
+                            break
+                        except:
+                            print(f"Folder swap failed {retry}x")
                 os.chdir(run_path)
                 spArray = run[0]
                 self.process.start(spArray[0], spArray[1:])
@@ -206,8 +211,13 @@ class MainWindow(QtWidgets.QMainWindow):
     
     def gameClosed(self):
         if self.runner_text == "GZDoom":
-            os.rename(os.path.join(os.getcwd(),"Save"), os.path.join(os.getcwd(),self.game_list.game))
-            os.rename(os.path.join(os.getcwd(),".Save"), os.path.join(os.getcwd(),"Save"))
+            for retry in range(100):
+                try:
+                    os.rename(os.path.join(os.getcwd(),"Save"), os.path.join(os.getcwd(),self.game_list.game))
+                    os.rename(os.path.join(os.getcwd(),".Save"), os.path.join(os.getcwd(),"Save"))
+                    break
+                except:
+                    print(f"Folder swap back failed {retry}x")
         os.chdir(self.original_path)
 
 if __name__ == "__main__":
