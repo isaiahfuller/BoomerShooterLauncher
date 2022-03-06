@@ -29,7 +29,7 @@ class GameScanner(QtWidgets.QFileDialog):
         db.init()
         fileName = os.path.realpath(fileName)
         prev = 0
-        fileNameSplit = fileName.split("\\")
+        fileNameSplit = fileName.split(os.sep)
         gameFileName = fileNameSplit[len(fileNameSplit) - 1]
         try:
             game = data.games[gameFileName.lower()]

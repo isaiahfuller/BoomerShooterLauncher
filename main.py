@@ -36,7 +36,6 @@ class MainWindow(QtWidgets.QMainWindow):
 
         file_toolbar = self.addToolBar("Toolbar")
         self.runner_toolbar = self.addToolBar("Launcher")
-        # self.insertToolBarBreak(self.runner_toolbar)
         file_toolbar.setMovable(False)
 
         file_menu = QtWidgets.QMenu("&File")
@@ -73,11 +72,11 @@ class MainWindow(QtWidgets.QMainWindow):
         self.discord_timer.timeout.connect(self.updateDiscordStatus)
         self.process.finished.connect(self.clearDiscordStatus)
         self.process.finished.connect(self.gameClosed)
+        self.clearDiscordStatus()
+        self.updateDiscordStatus()
 
         self.setCentralWidget(scroll)
         self.setAcceptDrops(True)
-        self.clearDiscordStatus()
-        self.updateDiscordStatus()
 
     def gameScanner(self):
         scanner = GameScanner()

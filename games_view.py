@@ -4,6 +4,7 @@ import json
 
 from PySide6 import QtCore, QtWidgets
 from collections import defaultdict
+from mods_view import *
 
 class GamesView(QtWidgets.QTableWidget):
     def __init__(self, runnerList):
@@ -13,6 +14,7 @@ class GamesView(QtWidgets.QTableWidget):
         self.bases = []
         self.modpacks = []
         self.files = []
+        self.row_data = []
         self.game = ""
         self.selected_row = 0
         self.modpack_selected = False
@@ -31,11 +33,16 @@ class GamesView(QtWidgets.QTableWidget):
         header.setSectionResizeMode(1, QtWidgets.QHeaderView.ResizeToContents)
         header.setSectionResizeMode(2, QtWidgets.QHeaderView.Stretch)
 
+        self.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
+        self.customContextMenuRequested.connect(self.generateMenu)
+        self.viewport().installEventFilter(self)
+
         self.refresh()
         self.itemSelectionChanged.connect(self.updateRow)
 
     def refresh(self):
         self.games.clear()
+        self.row_data.clear()
         self.clearContents()
         dbConnect = db.connect()
         try:
@@ -49,6 +56,7 @@ class GamesView(QtWidgets.QTableWidget):
                 # game = allGames[i] 
                 if os.path.exists(game[5]):
                     self.games.append(game)
+                    self.row_data.append(game)
                     if game in games:
                         self.setItem(count, 0, QtWidgets.QTableWidgetItem(game[7]))
                         # self.setItem(count, 1, QtWidgets.QTableWidgetItem(game[0] + " (" + str(game[3]) + ")"))
@@ -86,6 +94,7 @@ class GamesView(QtWidgets.QTableWidget):
                 if items:
                     pos = items[len(items) - 1].row() + 1
                     self.insertRow(pos)
+                    self.row_data.insert(pos, list)
                     self.setItem(pos, 0, QtWidgets.QTableWidgetItem(list[0]))
                     self.setItem(pos, 1, QtWidgets.QTableWidgetItem(list[1]))
                     self.setItem(pos, 2, QtWidgets.QTableWidgetItem(", ".join(list[5])))
@@ -104,3 +113,17 @@ class GamesView(QtWidgets.QTableWidget):
                     self.modpack_selected = False
                     self.files.clear()
                     break
+
+    def generateMenu(self, pos):
+        print(pos)
+        self.menu.exec_(self.mapToGlobal(pos))
+
+    def eventFilter(self, object: QtCore.QObject, event: QtCore.QEvent) -> bool:
+        if(event.type() == QtCore.QEvent.MouseButtonPress and event.buttons() == QtCore.Qt.RightButton and object is self.viewport()):
+            item = self.itemAt(event.pos()).row()
+            row = self.row_data[item]
+            self.menu = QtWidgets.QMenu(self)
+            if row[2] == "modpack":
+                self.mods_view = ModsView(self)
+                edit = self.menu.addAction("Edit modpack", self.mods_view.openFile)
+        return super().eventFilter(object, event)

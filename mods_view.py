@@ -1,7 +1,6 @@
 import json
 import os
 from PySide6 import QtCore, QtWidgets, QtGui
-from collections import defaultdict
 
 
 class ModsView(QtWidgets.QMainWindow):
@@ -186,7 +185,7 @@ class ModsView(QtWidgets.QMainWindow):
         name = self.mods["name"]
         if name != "":
             appData = os.getenv('APPDATA')
-            path = os.path.join(appData, "Boomer Shooter Launcher/", "Modpacks/")
+            path = os.path.join(appData, "Boomer Shooter Launcher", "Modpacks")
             os.makedirs(path, exist_ok=True)
             json_string = json.dumps(self.mods, indent=4)
             try:
@@ -213,3 +212,21 @@ class ModsView(QtWidgets.QMainWindow):
     def closeEvent(self, event: QtGui.QCloseEvent) -> None:
         self.game_list.refresh()
         return super().closeEvent(event)
+
+    def openFile(self):
+        name = self.game_list.selectedItems()[1].text()
+        path = os.path.join(os.getenv('APPDATA'), "Boomer Shooter Launcher", "Modpacks", f"{name}.json")
+        file = open(path)
+        json_data = json.load(file)
+        print(json_data)
+        self.name_edit.setText(json_data["name"])
+        self.base_combobox.setCurrentText(json_data["base"])
+        for file in json_data["files"]:
+            fileSplit = os.path.abspath(file["path"]).split(os.sep)
+            fileName = fileSplit[len(fileSplit) - 1]
+            self.center_left_list.addItem(fileName)
+        self.mod_name_edit.setText(json_data["files"][0]["name"])
+        self.mod_path_label.setText(json_data["files"][0]["path"])
+        self.mod_source_edit.setText(json_data["files"][0]["source"])
+        self.mods = json_data
+        self.showWindow()
