@@ -39,12 +39,13 @@ class MainWindow(QtWidgets.QMainWindow):
         file_toolbar.setMovable(False)
 
         file_menu = QtWidgets.QMenu("&File")
-        self.menuBar().addMenu(file_menu)
+        # self.menuBar().addMenu(file_menu)
         # file_toolbar.addAction("&Refresh Games", self.game_list.refresh)
-        file_toolbar.addAction("&Add modpack", self.showModWindow)
+        file_toolbar.addAction("&Manage Ports", self.runner_list.showWindowFromMenu)
+        file_toolbar.addAction("&Add Modpack", self.showModWindow)
 
-        file_menu.addAction("&Add game", self.gameScanner)
-        file_menu.addAction("&Manage runners", self.runner_list.showWindowFromMenu)
+        file_menu.addAction("&Add Games", self.gameScanner)
+        file_menu.addAction("&Manage Ports", self.runner_list.showWindowFromMenu)
 
         self.runner_combobox = QtWidgets.QComboBox()
         self.runner_combobox.addItem("Select a game first")

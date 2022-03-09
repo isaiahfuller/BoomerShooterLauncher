@@ -66,16 +66,18 @@ class RunnerView(QtWidgets.QMainWindow):
                 for j in data.runners[i]:
                     if not self.runnerList.findItems(j["name"], QtCore.Qt.MatchContains):
                         self.runnerList.addItem(j["name"])
-
-
         else:
-            for i in data.runners:
+            for i in data.runners[runner]:
                 if game in i["games"]:
                     if not self.runnerList.findItems(i["name"], QtCore.Qt.MatchExactly):
                         self.runnerList.addItem(i["name"])
     
     def setRunner(self, name):
         runners = []
+        if "[installed]" in name:
+            installed = True
+        else:
+            installed = False
         name = name.replace(" [installed]", "")
         for i in data.runners:
             runners.append(i)
@@ -86,7 +88,8 @@ class RunnerView(QtWidgets.QMainWindow):
                     self.descriptionLabel.setText("Description:\n" + i["description"])
                     self.url = i["link"]
                     self.downloadButton.setEnabled(True)
-                    self.selectInstalledButton.setEnabled(True)
+                    if installed: self.selectInstalledButton.setEnabled(False)
+                    else: self.selectInstalledButton.setEnabled(True)
                     break
 
     def getDownloadLink(self):
@@ -101,17 +104,20 @@ class RunnerView(QtWidgets.QMainWindow):
         self.runnerDialog.setFileMode(QtWidgets.QFileDialog.ExistingFile)
         con = db.connect()
         files = self.runnerDialog.getOpenFileUrl()
+        filePath = files[0].toLocalFile()
         try:
-            if not files[0].toLocalFile() == "":
+            if not filePath == "":
                 insertQuery = "INSERT INTO Runners values (?, ?, ?)"
-                insertData = (self.runnerList.selectedItems()[0].text(), self.runner, files[0].toLocalFile())
+                insertData = (self.runnerList.selectedItems()[0].text(), self.runner, filePath)
                 con.execute(insertQuery, insertData)
                 con.commit()
         except Exception as e:
             print(e)
         finally:
             con.close()
-            if not files[0].toLocalFile() == "":
+            if len(filePath) > 0:
+                self.builder(self.game, self.runner)
+                self.selectInstalledButton.setEnabled(False)
                 if not self.openedFromMenu: self.close()
 
     def closeEvent(self, event: QtGui.QCloseEvent) -> None:
