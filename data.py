@@ -245,6 +245,20 @@ games = {
         "runner": "doom",
         "game": "Hedon",
         "releases": []
+    },
+    "plutonia.wad": {
+        "name": "The Plutonia Experiment",
+        "year": 1996,
+        "runner": "doom",
+        "game": "Final Doom",
+        "releases": []
+    },
+    "tnt.wad": {
+        "name": "TNT: Evilution",
+        "year": 1996,
+        "runner": "doom",
+        "game": "Final Doom",
+        "releases": []
     }
 }
 
@@ -282,6 +296,12 @@ runners = {
             "name": "Crispy Doom",
             "link": "http://latest.chocolate-doom.org/",
             "description": "\"A friendly fork of Chocolate Doom that provides a higher display resolution, [...] and offers further optional visual, tactical and physical enhancements\"",
+            "games": ["Doom", "Doom II", "Final Doom", "Chex Quest"]
+        },
+        {
+            "name": "PrBoom+",
+            "link": "https://github.com/coelckers/prboom-plus/releases/latest",
+            "description": "\"Modified PrBoom port with uncapped framerate, variable gamespeed, re-record, walkcam, chasecam, full mouselook, fov and other features without loss of compatibility with original DOOM.\"",
             "games": ["Doom", "Doom II", "Final Doom", "Chex Quest"]
         }
     ],

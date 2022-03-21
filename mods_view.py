@@ -138,9 +138,10 @@ class ModsView(QtWidgets.QMainWindow):
 
     def baseComboBuilder(self):
         for game in self.games:
-            if game[0] not in self.bases:
-                self.base_combobox.addItem(game[0])
-                self.bases.append(game[0])
+            print(game[7])
+            if game[7] not in self.bases:
+                self.base_combobox.addItem(game[7])
+                self.bases.append(game[7])
         self.mods["base"] = self.bases[0]
 
     def baseChanged(self, text):

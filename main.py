@@ -1,7 +1,7 @@
 import sys
 import db
 import data
-import discord
+from discord import Discord
 from PySide6 import QtCore, QtWidgets, QtGui
 from games_view import *
 from scanner import *
@@ -13,6 +13,8 @@ class MainWindow(QtWidgets.QMainWindow):
     def __init__(self):
         super().__init__()
         db.init()
+        self.readSettings()
+        self.discord = Discord()
         
         self.runner_list = RunnerView()
         self.game_list = GamesView(self.runner_list)
@@ -39,8 +41,6 @@ class MainWindow(QtWidgets.QMainWindow):
         file_toolbar.setMovable(False)
 
         file_menu = QtWidgets.QMenu("&File")
-        # self.menuBar().addMenu(file_menu)
-        # file_toolbar.addAction("&Refresh Games", self.game_list.refresh)
         file_toolbar.addAction("&Manage Ports", self.runner_list.showWindowFromMenu)
         file_toolbar.addAction("&Add Modpack", self.showModWindow)
 
@@ -78,6 +78,22 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self.setCentralWidget(scroll)
         self.setAcceptDrops(True)
+
+    def writeSettings(self):
+        settings = QtCore.QSettings("fullerSpectrum", "Boomer Shooter Launcher")
+        settings.beginGroup("MainWindow")
+        settings.setValue("geometry", self.saveGeometry())
+        settings.endGroup()
+
+    def readSettings(self):
+        settings = QtCore.QSettings("fullerSpectrum", "Boomer Shooter Launcher")
+        settings.beginGroup("MainWindow")
+        geometry = settings.value("geometry", QtCore.QByteArray())
+        if (geometry.isEmpty()):
+            self.setGeometry(800, 800, 600, 600)
+        else:
+            self.restoreGeometry(geometry)
+        settings.endGroup()
 
     def gameScanner(self):
         scanner = GameScanner()
@@ -208,7 +224,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.updateDiscordStatus()
 
     def updateDiscordStatus(self):
-        discord.update(self.discord_state, self.discord_details, self.game_running)
+        self.discord.update(self.discord_state, self.discord_details, self.game_running)
     
     def gameClosed(self):
         if self.runner_text == "GZDoom":
@@ -221,11 +237,15 @@ class MainWindow(QtWidgets.QMainWindow):
                     print(f"Folder swap back failed {retry}x")
         os.chdir(self.original_path)
 
+    def closeEvent(self, event: QtGui.QCloseEvent) -> None:
+        self.writeSettings()
+        return super().closeEvent(event)
+
 if __name__ == "__main__":
     app = QtWidgets.QApplication([])
 
     widget = MainWindow()
-    widget.resize(800, 600)
+    # widget.resize(800, 600)
     widget.setWindowTitle("Boomer Shooter Launcher")
     widget.show()
 
