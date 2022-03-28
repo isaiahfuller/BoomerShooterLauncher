@@ -1,7 +1,8 @@
 import json
 import os
+import platform
 from PySide6 import QtCore, QtWidgets, QtGui
-
+from pathlib import Path
 
 class ModsView(QtWidgets.QMainWindow):
     def __init__(self, games):
@@ -185,9 +186,13 @@ class ModsView(QtWidgets.QMainWindow):
     def saveFile(self):
         name = self.mods["name"]
         if name != "":
-            appData = os.getenv('APPDATA')
-            path = os.path.join(appData, "Boomer Shooter Launcher", "Modpacks")
-            os.makedirs(path, exist_ok=True)
+            match platform.system():
+                case "Windows":
+                    appData = os.getenv('APPDATA')
+                    path = Path(appData, "Boomer Shooter Launcher", "Modpacks")
+                case "Linux":
+                    path = Path(Path.home(), ".config", "BoomerShooterLauncher", "Modpacks")
+            path.mkdir(exist_ok=True)
             json_string = json.dumps(self.mods, indent=4)
             try:
                 with open(os.path.join(path, f"{name}.json"), "w+") as outfile:

@@ -15,7 +15,7 @@ def runGame(game, game_path, runner, other_files):
             spArray.append("-file")
             spArray.append(i)
         if runner[0] == "Chocolate Doom":
-            mouse = open('MOUSE.CFG')
+            mouse = open('./MOUSE.CFG')
             spArray.append("-config")
             spArray.append(os.path.realpath(mouse.name))
     if runner[1] == "build":

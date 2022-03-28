@@ -1,7 +1,11 @@
 from PySide6 import QtCore, QtWidgets, QtGui
+from pathlib import Path
+import os
 import db
 import data
 import webbrowser
+import platform
+import subprocess
 
 class RunnerView(QtWidgets.QMainWindow):
     def __init__(self):
@@ -23,6 +27,7 @@ class RunnerView(QtWidgets.QMainWindow):
 
         self.buttonBox = QtWidgets.QHBoxLayout()
         self.downloadButton = QtWidgets.QPushButton("Download", self)
+
         self.selectInstalledButton = QtWidgets.QPushButton("Select", self)
         
         self.downloadButton.setEnabled(False)
@@ -72,18 +77,19 @@ class RunnerView(QtWidgets.QMainWindow):
                     if not self.runnerList.findItems(i["name"], QtCore.Qt.MatchExactly):
                         self.runnerList.addItem(i["name"])
     
-    def setRunner(self, name):
+    def setRunner(self):
         runners = []
-        if "[installed]" in name:
+        if "[installed]" in self.name:
             installed = True
         else:
             installed = False
-        name = name.replace(" [installed]", "")
+        self.name = self.name.replace(" [installed]", "")
         for i in data.runners:
             runners.append(i)
         for j in runners:
             for i in data.runners[j]:
-                if i["name"] == name:
+                if i["name"] == self.name:
+                    self.executable = i["executable"]
                     self.runner = j
                     self.descriptionLabel.setText("Description:\n" + i["description"])
                     self.url = i["link"]
@@ -97,25 +103,32 @@ class RunnerView(QtWidgets.QMainWindow):
 
     def updateText(self):
         name = self.runnerList.currentItem().text()
-        self.setRunner(name)
+        self.name = name
+        self.setRunner()
 
     def addToDb(self):
         db.init()
         self.runnerDialog.setFileMode(QtWidgets.QFileDialog.ExistingFile)
         con = db.connect()
-        files = self.runnerDialog.getOpenFileUrl()
-        filePath = files[0].toLocalFile()
-        try:
-            if not filePath == "":
-                insertQuery = "INSERT INTO Runners values (?, ?, ?)"
-                insertData = (self.runnerList.selectedItems()[0].text(), self.runner, filePath)
+        match platform.system():
+            case "Windows":
+                files = self.runnerDialog.getOpenFileUrl()
+                filePath = files[0].toLocalFile()
+            case "Linux":
+                exe = self.executable
+                file = subprocess.run(["which", exe], stdout=subprocess.PIPE)
+                filePath = Path(file.stdout.decode("utf-8"))
+        try:    
+            if filePath.stem.strip() == self.executable:
+                insertQuery = "INSERT INTO Runners values (?, ?, ?, ?)"
+                insertData = (self.runnerList.selectedItems()[0].text(), self.runner, str(filePath).strip(), self.executable)
                 con.execute(insertQuery, insertData)
                 con.commit()
         except Exception as e:
             print(e)
         finally:
             con.close()
-            if len(filePath) > 0:
+            if len(os.fspath(filePath)) > 0:
                 self.builder(self.game, self.runner)
                 self.selectInstalledButton.setEnabled(False)
                 if not self.openedFromMenu: self.close()

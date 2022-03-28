@@ -1,9 +1,11 @@
 import db
 import os
 import json
+import platform
 
 from PySide6 import QtCore, QtWidgets
 from collections import defaultdict
+from pathlib import Path
 from mods_view import *
 
 class GamesView(QtWidgets.QTableWidget):
@@ -79,9 +81,13 @@ class GamesView(QtWidgets.QTableWidget):
             dbConnect.close()
 
     def loadModpacks(self):
-        appData = os.getenv('APPDATA')
-        path = os.path.join(appData, "Boomer Shooter Launcher", "Modpacks")
-        os.makedirs(path, exist_ok=True)
+        match platform.system():
+            case "Windows":
+                appData = os.getenv('APPDATA')
+                path = Path(appData, "Boomer Shooter Launcher", "Modpacks")
+            case "Linux":
+                path = Path(Path.home(), ".config", "BoomerShooterLauncher", "Modpacks")
+        path.mkdir(exist_ok=True)
         modpacks = [os.path.join(path, f) for f in os.listdir(path)]
         for pack in modpacks:
             with open(pack) as json_file:

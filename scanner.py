@@ -2,6 +2,8 @@ import zlib
 import db
 import os
 import data
+import platform
+from pathlib import Path
 from PySide6 import QtWidgets
 
 
@@ -37,7 +39,6 @@ class GameScanner(QtWidgets.QFileDialog):
                 prev = zlib.crc32(eachLine, prev)
             crc = "%X" % (prev & 0xFFFFFFFF)
             crc = crc.lower()
-            # print(gameFileName + " - " + crc)
             found = False
             for i in game["releases"]:
                 if i["crc"] == crc:

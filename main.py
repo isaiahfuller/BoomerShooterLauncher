@@ -1,8 +1,10 @@
 import sys
 import db
 import data
+import platform
 from discord import Discord
 from PySide6 import QtCore, QtWidgets, QtGui
+from pathlib import Path
 from games_view import *
 from scanner import *
 from runner_view import *
@@ -13,6 +15,15 @@ class MainWindow(QtWidgets.QMainWindow):
     def __init__(self):
         super().__init__()
         db.init()
+
+        self.platform = platform.system()
+
+        match self.platform:
+            case "Windows":
+                self.settings = QtCore.QSettings("fullerSpectrum", "Boomer Shooter Launcher")
+            case "Linux":
+                self.settings = QtCore.QSettings("BoomerShooterLauncher", "Boomer Shooter Launcher")
+        
         self.readSettings()
         self.discord = Discord()
         
@@ -80,20 +91,18 @@ class MainWindow(QtWidgets.QMainWindow):
         self.setAcceptDrops(True)
 
     def writeSettings(self):
-        settings = QtCore.QSettings("fullerSpectrum", "Boomer Shooter Launcher")
-        settings.beginGroup("MainWindow")
-        settings.setValue("geometry", self.saveGeometry())
-        settings.endGroup()
+        self.settings.beginGroup("MainWindow")
+        self.settings.setValue("geometry", self.saveGeometry())
+        self.settings.endGroup()
 
     def readSettings(self):
-        settings = QtCore.QSettings("fullerSpectrum", "Boomer Shooter Launcher")
-        settings.beginGroup("MainWindow")
-        geometry = settings.value("geometry", QtCore.QByteArray())
+        self.settings.beginGroup("MainWindow")
+        geometry = self.settings.value("geometry", QtCore.QByteArray())
         if (geometry.isEmpty()):
-            self.setGeometry(800, 800, 600, 600)
+            self.setGeometry(0, 0, 800, 600)
         else:
             self.restoreGeometry(geometry)
-        settings.endGroup()
+        self.settings.endGroup()
 
     def gameScanner(self):
         scanner = GameScanner()
@@ -169,29 +178,33 @@ class MainWindow(QtWidgets.QMainWindow):
             game_data = c.execute(game_query, (version_text,)).fetchone()
             game = game_data[0]
             game_type = game_data[1]
-            # print(game_data)
-
             if self.runner_text == "Add source port":
                 self.runner_list.showWindow(self.game, game_type)
             else:
                 self.original_path = os.getcwd()
                 runner = c.execute(runner_query, (self.runner_text,)).fetchone()
-                run = runGame(self.game, game, runner, self.game_list.files)
-                run_path = run[1]
+                if "(Modded)" in self.game_list.selectedItems()[0].text():
+                    run = runGame(self.game, game, runner, self.game_list.files)
+                else:
+                    run = runGame(self.game, game, runner, [])
+                match self.platform:
+                    case "Windows": run_path = run[1]
+                    case "Linux": run_path = Path(Path.home(), ".config", runner[3])
                 if self.runner_text in ["Chocolate Doom", "Crispy Doom"]:
-                    run_path = os.path.join(run[1], self.game_list.game)
+                    match self.platform:
+                        case "Windows": run_path = os.path.join(run[1], self.game_list.game)
+                        case "Linux": run_path = Path(Path.home(), ".local", "share", runner[3], self.game_list.game)
+                    run[0].append("-savedir")
+                    run[0].append(str(run_path))
                     os.makedirs(run_path, exist_ok=True)
-                if self.runner_text == "GZDoom":
-                    for retry in range(100):
-                        try:
-                            os.rename(os.path.join(run[1],"Save"), os.path.join(run[1],".Save"))
-                            os.makedirs(os.path.join(run[1], self.game_list.game), exist_ok=True)
-                            os.rename(os.path.join(run[1], self.game_list.game), os.path.join(run[1],"Save"))
-                            break
-                        except:
-                            print(f"Folder swap failed {retry}x")
+                else:
+                    run_path = Path(run_path, self.game_list.game)
+                    os.makedirs(run_path, exist_ok=True)
+                    run[0].append("-savedir")
+                    run[0].append(str(run_path))
                 os.chdir(run_path)
                 spArray = run[0]
+                print(spArray)
                 self.process.start(spArray[0], spArray[1:])
                 self.discord_details = f"Playing {self.game_list.game} with {self.runner_text}"
                 self.discord_state = version_text
@@ -227,14 +240,14 @@ class MainWindow(QtWidgets.QMainWindow):
         self.discord.update(self.discord_state, self.discord_details, self.game_running)
     
     def gameClosed(self):
-        if self.runner_text == "GZDoom":
-            for retry in range(100):
-                try:
-                    os.rename(os.path.join(os.getcwd(),"Save"), os.path.join(os.getcwd(),self.game_list.game))
-                    os.rename(os.path.join(os.getcwd(),".Save"), os.path.join(os.getcwd(),"Save"))
-                    break
-                except:
-                    print(f"Folder swap back failed {retry}x")
+        # if self.runner_text == "GZDoom":
+        #     for retry in range(100):
+        #         try:
+        #             os.rename(os.path.join(os.getcwd(),"Save"), os.path.join(os.getcwd(),self.game_list.game))
+        #             os.rename(os.path.join(os.getcwd(),".Save"), os.path.join(os.getcwd(),"Save"))
+        #             break
+        #         except:
+        #             print(f"Folder swap back failed {retry}x")
         os.chdir(self.original_path)
 
     def closeEvent(self, event: QtGui.QCloseEvent) -> None:
