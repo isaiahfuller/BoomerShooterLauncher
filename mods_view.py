@@ -1,6 +1,7 @@
 import json
 import os
 import platform
+import logging
 from PySide6 import QtCore, QtWidgets, QtGui
 from pathlib import Path
 
@@ -115,7 +116,6 @@ class ModsView(QtWidgets.QMainWindow):
         files = [u.toLocalFile() for u in event.mimeData().urls()]
         for path in files:
             self.addFileToList(path)
-        print(self.mods)
 
     def addFileToList(self, filePath):
         fileSplit = filePath.split("/")
@@ -124,7 +124,6 @@ class ModsView(QtWidgets.QMainWindow):
         nameSplit[len(nameSplit) - 1] = ""
         modName = ".".join(nameSplit)
         modName = modName[0:len(modName) - 1]
-        print(f"{filePath}\n{fileName}\n{modName}")
         found = False
         for i in self.mods["files"]:
             if i["path"] == filePath:
@@ -139,7 +138,6 @@ class ModsView(QtWidgets.QMainWindow):
 
     def baseComboBuilder(self):
         for game in self.games:
-            print(game[7])
             if game[7] not in self.bases:
                 self.base_combobox.addItem(game[7])
                 self.bases.append(game[7])
@@ -175,7 +173,6 @@ class ModsView(QtWidgets.QMainWindow):
             self.mods["files"][row+i] = self.mods["files"][row]
             self.mods["files"][row] = tempObj
             self.selected = self.center_left_list.currentRow()
-            print(self.mods)
 
     def moveUp(self):
         self.changeModPosition(-1)
@@ -197,6 +194,7 @@ class ModsView(QtWidgets.QMainWindow):
             try:
                 with open(os.path.join(path, f"{name}.json"), "w+") as outfile:
                     outfile.write(json_string)
+                    logging.info(f"[Mod editor] Saved {name}.json")
             finally:
                 outfile.close()
                 self.game_list.refresh()
@@ -224,7 +222,6 @@ class ModsView(QtWidgets.QMainWindow):
         path = os.path.join(os.getenv('APPDATA'), "Boomer Shooter Launcher", "Modpacks", f"{name}.json")
         file = open(path)
         json_data = json.load(file)
-        print(json_data)
         self.name_edit.setText(json_data["name"])
         self.base_combobox.setCurrentText(json_data["base"])
         for file in json_data["files"]:

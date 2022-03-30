@@ -1,7 +1,6 @@
-from glob import glob
-from logging import exception
 import os
 import time
+import logging
 from pypresence import Presence
 from dotenv import load_dotenv
 
@@ -19,7 +18,7 @@ class Discord:
             self.failed = False
         except:
             self.failed = True
-            print("Failed to connect to Discord")
+            logging.warning("[Discord] Failed to connect")
 
 
     def update(self, newState, newDetails, running):

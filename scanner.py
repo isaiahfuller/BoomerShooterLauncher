@@ -3,6 +3,7 @@ import db
 import os
 import data
 import platform
+import logging
 from pathlib import Path
 from PySide6 import QtWidgets
 
@@ -55,5 +56,7 @@ class GameScanner(QtWidgets.QFileDialog):
                 name = game["name"]
                 gameInfo = (game["name"], f"{name} vUnk-{crc}", crc, game["year"], crc, fileName, game["runner"], game["game"])
                 db.addGame(gameInfo, tableRefresh, self)
+            logging.info(f"[Scanner] Added {gameInfo[0]} {gameInfo[1]} from {gameInfo[5]}")
         except Exception as e:
-            print(e)
+            logging.exception(e)
+            logging.warning("[Scanner] Failed to scan file")

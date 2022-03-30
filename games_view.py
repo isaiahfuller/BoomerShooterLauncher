@@ -2,6 +2,7 @@ import db
 import os
 import json
 import platform
+import logging
 
 from PySide6 import QtCore, QtWidgets
 from collections import defaultdict
@@ -43,6 +44,7 @@ class GamesView(QtWidgets.QTableWidget):
         self.itemSelectionChanged.connect(self.updateRow)
 
     def refresh(self):
+        logging.info("[Game List] Refreshing table")
         self.games.clear()
         self.row_data.clear()
         self.clearContents()
@@ -76,7 +78,7 @@ class GamesView(QtWidgets.QTableWidget):
                 self.setItem(i, 2, QtWidgets.QTableWidgetItem(", ".join(filesArray[games[i][0]])))
             self.loadModpacks()
         except Exception as e:
-            print(e)
+            logging.exception(e)
         finally:
             dbConnect.close()
 
@@ -121,7 +123,6 @@ class GamesView(QtWidgets.QTableWidget):
                     break
 
     def generateMenu(self, pos):
-        print(pos)
         self.menu.exec_(self.mapToGlobal(pos))
 
     def eventFilter(self, object: QtCore.QObject, event: QtCore.QEvent) -> bool:

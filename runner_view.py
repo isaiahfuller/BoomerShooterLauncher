@@ -1,5 +1,6 @@
 from PySide6 import QtCore, QtWidgets, QtGui
 from pathlib import Path
+import logging
 import os
 import db
 import data
@@ -125,7 +126,8 @@ class RunnerView(QtWidgets.QMainWindow):
                 con.execute(insertQuery, insertData)
                 con.commit()
         except Exception as e:
-            print(e)
+            logging.exception(e)
+            logging.warning(f"[Runner List] Failed to add {self.runnerList.selectedItems()[0].text()} to db")
         finally:
             con.close()
             if len(os.fspath(filePath)) > 0:

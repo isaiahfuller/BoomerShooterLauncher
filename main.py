@@ -204,12 +204,15 @@ class MainWindow(QtWidgets.QMainWindow):
                     run[0].append(str(run_path))
                 os.chdir(run_path)
                 spArray = run[0]
-                print(spArray)
                 self.process.start(spArray[0], spArray[1:])
+
                 self.discord_details = f"Playing {self.game_list.game} with {self.runner_text}"
                 self.discord_state = version_text
                 self.game_running = True
                 self.updateDiscordStatus()
+        except Exception as e:
+            logging.exception(e)
+            logging.error("[Launcher] Failed to launch game")
         finally:
             c.close()
         
@@ -240,14 +243,6 @@ class MainWindow(QtWidgets.QMainWindow):
         self.discord.update(self.discord_state, self.discord_details, self.game_running)
     
     def gameClosed(self):
-        # if self.runner_text == "GZDoom":
-        #     for retry in range(100):
-        #         try:
-        #             os.rename(os.path.join(os.getcwd(),"Save"), os.path.join(os.getcwd(),self.game_list.game))
-        #             os.rename(os.path.join(os.getcwd(),".Save"), os.path.join(os.getcwd(),"Save"))
-        #             break
-        #         except:
-        #             print(f"Folder swap back failed {retry}x")
         os.chdir(self.original_path)
 
     def closeEvent(self, event: QtGui.QCloseEvent) -> None:
