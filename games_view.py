@@ -66,7 +66,7 @@ class GamesView(QtWidgets.QTableWidget):
                         # self.setItem(count, 1, QtWidgets.QTableWidgetItem(game[0] + " (" + str(game[3]) + ")"))
                         self.setItem(count, 1, QtWidgets.QTableWidgetItem(game[0]))
                         count = count + 1
-                    fileNameSplit = game[5].split("\\")
+                    fileNameSplit = game[5].split(os.sep)
                     fileName = fileNameSplit[len(fileNameSplit) - 1]
                     filesArray[game[0]].append(f"{fileName} - {game[2]}")
                 else:
@@ -89,7 +89,7 @@ class GamesView(QtWidgets.QTableWidget):
                 path = Path(appData, "Boomer Shooter Launcher", "Modpacks")
             case "Linux":
                 path = Path(Path.home(), ".config", "BoomerShooterLauncher", "Modpacks")
-        path.mkdir(exist_ok=True)
+        os.makedirs(path, exist_ok=True)
         modpacks = [os.path.join(path, f) for f in os.listdir(path)]
         for pack in modpacks:
             with open(pack) as json_file:

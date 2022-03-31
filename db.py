@@ -17,7 +17,7 @@ def connect():
         path = Path(appData, "fullerSpectrum/", "Boomer Shooter Launcher/")
     else:
         path = Path(f"{Path.home()}/.config/BoomerShooterLauncher/")
-    os.makedirs(path, exist_ok=True)
+    os.makedirs(Path(path, "Modpacks"), exist_ok=True)
     con = sqlite3.connect(os.fspath(path) + "/games.db")
     return con
 
