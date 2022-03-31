@@ -34,29 +34,30 @@ class GameScanner(QtWidgets.QFileDialog):
         prev = 0
         fileNameSplit = fileName.split(os.sep)
         gameFileName = fileNameSplit[len(fileNameSplit) - 1]
-        try:
-            game = data.games[gameFileName.lower()]
-            for eachLine in open(fileName, "rb"):
-                prev = zlib.crc32(eachLine, prev)
-            crc = "%X" % (prev & 0xFFFFFFFF)
-            crc = crc.lower()
-            found = False
-            for i in game["releases"]:
-                if i["crc"] == crc:
-                    base = game["name"]
-                    if "name" in i:
-                        name = i["name"]
-                    else:
-                        name = game["name"]
-                    gameInfo = (base, name, i["version"], game["year"], crc, fileName, game["runner"], game["game"])
+        if gameFileName.lower() in data.games:
+            try:
+                game = data.games[gameFileName.lower()]
+                for eachLine in open(fileName, "rb"):
+                    prev = zlib.crc32(eachLine, prev)
+                crc = "%X" % (prev & 0xFFFFFFFF)
+                crc = crc.lower()
+                found = False
+                for i in game["releases"]:
+                    if i["crc"] == crc:
+                        base = game["name"]
+                        if "name" in i:
+                            name = i["name"]
+                        else:
+                            name = game["name"]
+                        gameInfo = (base, name, i["version"], game["year"], crc, fileName, game["runner"], game["game"])
+                        db.addGame(gameInfo, tableRefresh, self)
+                        found = True
+                        break
+                if not found:
+                    name = game["name"]
+                    gameInfo = (game["name"], f"{name} vUnk-{crc}", crc, game["year"], crc, fileName, game["runner"], game["game"])
                     db.addGame(gameInfo, tableRefresh, self)
-                    found = True
-                    break
-            if not found:
-                name = game["name"]
-                gameInfo = (game["name"], f"{name} vUnk-{crc}", crc, game["year"], crc, fileName, game["runner"], game["game"])
-                db.addGame(gameInfo, tableRefresh, self)
-            logging.info(f"[Scanner] Added {gameInfo[0]} {gameInfo[1]} from {gameInfo[5]}")
-        except Exception as e:
-            logging.exception(e)
-            logging.warning("[Scanner] Failed to scan file")
+                logging.info(f"[Scanner] Added {gameInfo[0]} {gameInfo[1]} from {gameInfo[5]}")
+            except Exception as e:
+                logging.exception(e)
+                logging.warning("[Scanner] Failed to scan file")
