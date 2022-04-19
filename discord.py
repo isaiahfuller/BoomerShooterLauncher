@@ -9,6 +9,7 @@ client_id = os.getenv("DISCORD_CLIENTID")
 
 class Discord:
     def __init__(self):
+        self.logger = logging.getLogger("Discord")
         self.current_time = time.time()
         self.state = ""
         self.details = ""
@@ -18,7 +19,7 @@ class Discord:
             self.failed = False
         except:
             self.failed = True
-            logging.warning("[Discord] Failed to connect")
+            self.logger.warning("Failed to connect")
 
 
     def update(self, newState, newDetails, running):
@@ -27,5 +28,6 @@ class Discord:
                 self.current_time = time.time()
                 self.state = newState
                 self.details = newDetails
+                self.logger.info("Status updated")
                 
             upd = self.RPC.update(state = newState, details = newDetails, start = self.current_time)

@@ -11,8 +11,6 @@ class ModsView(QtWidgets.QMainWindow):
         super().__init__()
 
         self.logger = logging.getLogger("Modpack Editor")
-        if "--debug" in sys.argv:
-            self.logger.setLevel(logging.DEBUG)
         match platform.system():
             case "Windows":
                 self.settings = QtCore.QSettings("fullerSpectrum", "Boomer Shooter Launcher")
@@ -207,7 +205,7 @@ class ModsView(QtWidgets.QMainWindow):
             match platform.system():
                 case "Windows":
                     appData = os.getenv('APPDATA')
-                    path = Path(appData, "Boomer Shooter Launcher", "Modpacks")
+                    path = Path(appData, "fullerSpectrum", "Boomer Shooter Launcher", "Modpacks")
                 case "Linux":
                     path = Path(Path.home(), ".config", "BoomerShooterLauncher", "Modpacks")
             path.mkdir(exist_ok=True)
@@ -243,7 +241,7 @@ class ModsView(QtWidgets.QMainWindow):
         match platform.system():
             case "Windows":
                 appData = os.getenv('APPDATA')
-                path = Path(appData, "Boomer Shooter Launcher", "Modpacks", f"{name}.json")
+                path = Path(appData, "fullerSpectrum", "Boomer Shooter Launcher", "Modpacks", f"{name}.json")
             case "Linux":
                 path = Path(Path.home(), ".config", "BoomerShooterLauncher", "Modpacks", f"{name}.json")
         file = open(path)
@@ -267,7 +265,7 @@ class ModsView(QtWidgets.QMainWindow):
         match platform.system():
             case "Windows":
                 appData = os.getenv('APPDATA')
-                path = Path(appData, "Boomer Shooter Launcher", "Modpacks", f"{name}.json")
+                path = Path(appData, "fullerSpectrum", "Boomer Shooter Launcher", "Modpacks", f"{name}.json")
             case "Linux":
                 path = Path(Path.home(), ".config", "BoomerShooterLauncher", "Modpacks", f"{name}.json")
         os.remove(path)

@@ -13,8 +13,6 @@ from mods_view import *
 class GamesView(QtWidgets.QTableWidget):
     def __init__(self, runnerList):
         self.logger = logging.getLogger("Game List")
-        if "--debug" in sys.argv:
-            self.logger.setLevel(logging.DEBUG)
         match platform.system():
             case "Windows":
                 self.settings = QtCore.QSettings("fullerSpectrum", "Boomer Shooter Launcher")
@@ -22,6 +20,7 @@ class GamesView(QtWidgets.QTableWidget):
                 self.settings = QtCore.QSettings("BoomerShooterLauncher", "Boomer Shooter Launcher")
 
         super().__init__()
+        self.logger.debug("Building game list")
         self.runnerList = runnerList
         self.games = []
         self.bases = []
@@ -112,7 +111,7 @@ class GamesView(QtWidgets.QTableWidget):
         match platform.system():
             case "Windows":
                 appData = os.getenv('APPDATA')
-                path = Path(appData, "Boomer Shooter Launcher", "Modpacks")
+                path = Path(appData, "fullerSpectrum", "Boomer Shooter Launcher", "Modpacks")
             case "Linux":
                 path = Path(Path.home(), ".config", "BoomerShooterLauncher", "Modpacks")
         os.makedirs(path, exist_ok=True)

@@ -8,8 +8,6 @@ class GameLauncher(QtCore.QProcess):
     def __init__(self):
         super().__init__()
         self.logger = logging.getLogger("Game Scanner")
-        if "--debug" in sys.argv:
-            self.logger.setLevel(logging.DEBUG)
         match platform.system():    
             case "Windows":
                 self.settings = QtCore.QSettings("fullerSpectrum", "Boomer Shooter Launcher")

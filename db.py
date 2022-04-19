@@ -6,9 +6,6 @@ import logging
 from pathlib import Path
 
 logger = logging.getLogger("Database")
-if "--debug" in sys.argv:
-    logger.setLevel(logging.DEBUG)
-print(logger.level)
 
 def init():
     logger.debug("Database init")

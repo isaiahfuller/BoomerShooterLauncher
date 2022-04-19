@@ -13,8 +13,6 @@ class RunnerView(QtWidgets.QMainWindow):
     def __init__(self):
         super().__init__()
         self.logger = logging.getLogger("Modpack Editor")
-        if "--debug" in sys.argv:
-            self.logger.setLevel(logging.DEBUG)
 
         match platform.system():
             case "Windows":

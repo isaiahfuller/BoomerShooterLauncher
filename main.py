@@ -12,10 +12,13 @@ from mods_view import *
 from launcher import *
 
 class MainWindow(QtWidgets.QMainWindow):
-    def __init__(self, logger):
+    def __init__(self):
         super().__init__()
         db.init()
-        self.logger = logger
+        self.logger = logging.getLogger("Main window")
+        if "--debug" in sys.argv:
+            self.logger.setLevel(logging.DEBUG)
+            self.logger.debug("Debug mode")
         self.platform = platform.system()
 
         match self.platform:
@@ -65,6 +68,7 @@ class MainWindow(QtWidgets.QMainWindow):
         file_toolbar.addAction("&Add Runners", self.runner_list.showWindowFromMenu)
         file_toolbar.addAction("&Add Games", self.gameScanner)
         file_toolbar.addAction("&Add Modpack", self.showModWindow)
+        file_toolbar.addAction("&R", self.game_list.refresh)
 
         # file_menu.addAction("&Add Games", self.gameScanner)
         # file_menu.addAction("&Manage Ports", self.runner_list.showWindowFromMenu)
@@ -219,7 +223,7 @@ class MainWindow(QtWidgets.QMainWindow):
                     run[0].append(str(run_path))
                 os.chdir(run_path)
                 spArray = run[0]
-                logger.debug(f"Array: {spArray}")
+                self.logger.debug(f"Array: {spArray}")
                 self.process.start(spArray[0], spArray[1:])
 
                 self.discord_details = f"Playing {self.game_list.game} with {self.runner_text}"
@@ -227,8 +231,8 @@ class MainWindow(QtWidgets.QMainWindow):
                 self.game_running = True
                 self.updateDiscordStatus()
         except Exception as e:
-            logger.exception(e)
-            logger.error("Failed to launch game")
+            self.logger.exception(e)
+            self.logger.error("Failed to launch game")
         finally:
             c.close()
         
@@ -266,12 +270,11 @@ class MainWindow(QtWidgets.QMainWindow):
         return super().closeEvent(event)
 
 if __name__ == "__main__":
-    logger = logging.getLogger("main")
-    if "--debug" in sys.argv:
-        logger.setLevel(logging.DEBUG)
     app = QtWidgets.QApplication([])
-
-    widget = MainWindow(logger)
+    logging.basicConfig()
+    if "--debug" in sys.argv:
+        logging.root.setLevel(logging.DEBUG)
+    widget = MainWindow()
     widget.setWindowTitle("Boomer Shooter Launcher")
     widget.show()
 
