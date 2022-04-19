@@ -412,7 +412,7 @@ games = {
         "releases": []
     }
 }
-
+game_blacklist = ["2587d97b","8fe33445","c8a8b5ea","f97fe671"]
 runners = {
     "GZDoom": {
         "link": "https://github.com/coelckers/gzdoom/releases/latest",

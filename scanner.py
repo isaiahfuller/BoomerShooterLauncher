@@ -11,6 +11,7 @@ from PySide6 import QtWidgets, QtCore
 class GameScanner(QtWidgets.QFileDialog):
     def __init__(self):
         super().__init__()
+        db.init()
         self.logger = logging.getLogger("Game Scanner")
         match platform.system():    
             case "Windows":
@@ -38,7 +39,6 @@ class GameScanner(QtWidgets.QFileDialog):
 
 
     def individualFile(self, fileName):
-        db.init()
         fileName = os.path.realpath(fileName)
         prev = 0
         fileNameSplit = fileName.split(os.sep)
@@ -52,42 +52,38 @@ class GameScanner(QtWidgets.QFileDialog):
                 crc = "%X" % (prev & 0xFFFFFFFF)
                 crc = crc.lower()
                 found = False
-                for i in game["releases"]:
-                    if i["crc"] == crc:
-                        base = game["name"]
-                        if "name" in i:
-                            name = i["name"]
-                        else:
-                            name = game["name"]
-                        gameInfo = (base, name, i["version"], game["year"], crc, fileName, game["runner"], game["game"])
+                if crc not in data.game_blacklist:
+                    for i in game["releases"]:
+                        if i["crc"] == crc:
+                            base = game["name"]
+                            if "name" in i:
+                                name = i["name"]
+                            else:
+                                name = game["name"]
+                            gameInfo = (base, name, i["version"], game["year"], crc, fileName, game["runner"], game["game"])
+                            db.addGame(gameInfo, self)
+                            found = True
+                            self.logger.debug(f"{gameFileName} crc {crc} matches")
+                            break
+                    if not found:
+                        name = game["name"]
+                        base = name
+                        gameInfo = (name, f"{name} vUnk-{crc}", crc, game["year"], crc, fileName, game["runner"], game["game"])
                         db.addGame(gameInfo, self)
-                        found = True
-                        self.logger.debug(f"{gameFileName} crc {crc} matches")
-                        break
-                if not found:
-                    name = game["name"]
-                    base = name
-                    gameInfo = (name, f"{name} vUnk-{crc}", crc, game["year"], crc, fileName, game["runner"], game["game"])
-                    db.addGame(gameInfo, self)
-                    self.logger.debug(f"{gameFileName} crc {crc} doesn't match")
-                self.settings.beginGroup(f"Games/{gameInfo[0]}/{gameInfo[1]}")
-                # self.settings.setValue("base", gameInfo[0])
-                # self.settings.setValue("name", gameInfo[1])
-                self.settings.setValue("version", gameInfo[2])
-                self.settings.setValue("year", gameInfo[3])
-                self.settings.setValue("crc", gameInfo[4])
-                self.settings.setValue("path", gameInfo[5])
-                self.settings.setValue("runner", gameInfo[6])
-                self.settings.setValue("game", gameInfo[7])
-                self.settings.endGroup()
-                self.logger.info(f"Added {gameInfo[0]}: {gameInfo[1]} from {gameInfo[5]}")
-                # if self.settings.value(f"Bases/{base}") == None:
-                #     self.settings.setValue(f"Bases/{base}", [gameInfo[4]])
-                # else:
-                #     temp = self.settings.value(f"Bases/{base}").copy()
-                #     temp.append(gameInfo[4])
-                #     self.settings.setValue(f"Bases/{base}", temp)
-
+                        self.logger.debug(f"{gameFileName} crc {crc} doesn't match")
+                    self.settings.beginGroup(f"Games/{gameInfo[0]}/{gameInfo[1]}")
+                    # self.settings.setValue("base", gameInfo[0])
+                    # self.settings.setValue("name", gameInfo[1])
+                    self.settings.setValue("version", gameInfo[2])
+                    self.settings.setValue("year", gameInfo[3])
+                    self.settings.setValue("crc", gameInfo[4])
+                    self.settings.setValue("path", gameInfo[5])
+                    self.settings.setValue("runner", gameInfo[6])
+                    self.settings.setValue("game", gameInfo[7])
+                    self.settings.endGroup()
+                    self.logger.info(f"Added {gameInfo[0]}: {gameInfo[1]} from {gameInfo[5]}")
+                else:
+                    self.logger.info(f"Blacklisted crc {crc} found")
             except Exception as e:
                 self.logger.exception(e)
                 self.logger.warning(f"Failed to scan file {fileName}")

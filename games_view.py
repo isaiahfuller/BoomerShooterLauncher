@@ -6,7 +6,6 @@ import platform
 import logging
 
 from PySide6 import QtCore, QtWidgets
-from collections import defaultdict
 from pathlib import Path
 from mods_view import *
 
@@ -23,7 +22,6 @@ class GamesView(QtWidgets.QTableWidget):
         self.logger.debug("Building game list")
         self.runnerList = runnerList
         self.games = []
-        self.bases = []
         self.modpacks = []
         self.files = []
         self.row_data = []
@@ -58,49 +56,51 @@ class GamesView(QtWidgets.QTableWidget):
         self.row_data.clear()
         self.clearContents()
         dbConnect = db.connect()
-        # print(self.settings.value("Bases/The Plutonia Experiment"))
         self.settings.beginGroup("Games")
-        settingsGroups = self.settings.childGroups()
-        for group in settingsGroups:
-            self.settings.beginGroup(group)
-            # print(group)
-            # print(self.settings.childGroups())
-            # print(self.settings.value("base"))
-            # print(self.settings.value("name"))
-            # print(self.settings.value("version"))
-            # print(self.settings.value("year"))
-            # print(self.settings.value("crc"))
-            # print(self.settings.value("path"))
-            # print(self.settings.value("runner"))
-            # print(self.settings.value("game"))
+        self.setRowCount(len(self.settings.childGroups()))
+        # filesArray = defaultdict(list)
+        for i, base in enumerate(self.settings.childGroups(),start=0):
+            self.settings.beginGroup(base)
+            filesArray = []
+            for j, game in enumerate(self.settings.childGroups(), start=0):
+                self.settings.beginGroup(game)
+                self.setItem(i,0,QtWidgets.QTableWidgetItem(self.settings.value("game")))
+                self.setItem(i,1,QtWidgets.QTableWidgetItem(base))
+                fileNameSplit = self.settings.value("path").split(os.sep)
+                fileName = fileNameSplit[len(fileNameSplit) - 1]
+                version = self.settings.value("version")
+                filesArray.append(f"{fileName} - {version}")
+                self.settings.endGroup()
+            self.setItem(i, 2, QtWidgets.QTableWidgetItem(", ".join(filesArray)))
             self.settings.endGroup()
         self.settings.endGroup()
         try:
-            self.setRowCount(dbConnect.execute('SELECT count(DISTINCT base) from Games').fetchone()[0])
+            # self.setRowCount(dbConnect.execute('SELECT count(DISTINCT base) from Games').fetchone()[0])
             self.bases = dbConnect.execute('SELECT * FROM Games GROUP BY base ORDER BY game').fetchall()
             allGames = dbConnect.execute('SELECT * FROM Games ORDER BY game').fetchall()
-            count = 0
-            filesArray = defaultdict(list)
+            # count = 0
             for game in allGames:
                 if os.path.exists(game[5]):
                     self.games.append(game)
                     self.row_data.append(game)
-                    if game in self.bases:
-                        self.setItem(count, 0, QtWidgets.QTableWidgetItem(game[7]))
-                        self.setItem(count, 1, QtWidgets.QTableWidgetItem(game[0]))
-                        count = count + 1
-                    fileNameSplit = game[5].split(os.sep)
-                    fileName = fileNameSplit[len(fileNameSplit) - 1]
-                    filesArray[game[0]].append(f"{fileName} - {game[2]}")
+                    # if game in self.bases:
+                        # self.setItem(count, 0, QtWidgets.QTableWidgetItem(game[7]))
+                        # self.setItem(count, 1, QtWidgets.QTableWidgetItem(game[0]))
+                        # count = count + 1
+                    # fileNameSplit = game[5].split(os.sep)
+                    # fileName = fileNameSplit[len(fileNameSplit) - 1]
+                    # filesArray[game[0]].append(f"{fileName} - {game[2]}")
                 else:
                     self.logger.debug(f"Removing {game}")
                     dbConnect.execute('DELETE FROM Games WHERE crc=?', (game[4],))
                     dbConnect.commit()
                     self.refresh()
                     break
-            for i in range(len(self.bases)):
-                self.setItem(i, 2, QtWidgets.QTableWidgetItem(", ".join(filesArray[self.bases[i][0]])))
+            # for i in range(len(self.bases)):
+            #     self.setItem(i, 2, QtWidgets.QTableWidgetItem(", ".join(filesArray[self.bases[i][0]])))
+            #     print(filesArray)
             self.loadModpacks()
+            self.sortItems(0, order=QtCore.Qt.AscendingOrder)
         except Exception as e:
             self.logger.exception(e)
         finally:
