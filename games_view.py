@@ -1,3 +1,4 @@
+import sys
 import db
 import os
 import json
@@ -11,6 +12,15 @@ from mods_view import *
 
 class GamesView(QtWidgets.QTableWidget):
     def __init__(self, runnerList):
+        self.logger = logging.getLogger("Game List")
+        if "--debug" in sys.argv:
+            self.logger.setLevel(logging.DEBUG)
+        match platform.system():
+            case "Windows":
+                self.settings = QtCore.QSettings("fullerSpectrum", "Boomer Shooter Launcher")
+            case "Linux":
+                self.settings = QtCore.QSettings("BoomerShooterLauncher", "Boomer Shooter Launcher")
+
         super().__init__()
         self.runnerList = runnerList
         self.games = []
@@ -44,45 +54,61 @@ class GamesView(QtWidgets.QTableWidget):
         self.itemSelectionChanged.connect(self.updateRow)
 
     def refresh(self):
-        logging.info("[Game List] Refreshing table")
+        self.logger.info("Refreshing table")
         self.games.clear()
         self.row_data.clear()
         self.clearContents()
         dbConnect = db.connect()
+        # print(self.settings.value("Bases/The Plutonia Experiment"))
+        self.settings.beginGroup("Games")
+        settingsGroups = self.settings.childGroups()
+        for group in settingsGroups:
+            self.settings.beginGroup(group)
+            # print(group)
+            # print(self.settings.childGroups())
+            # print(self.settings.value("base"))
+            # print(self.settings.value("name"))
+            # print(self.settings.value("version"))
+            # print(self.settings.value("year"))
+            # print(self.settings.value("crc"))
+            # print(self.settings.value("path"))
+            # print(self.settings.value("runner"))
+            # print(self.settings.value("game"))
+            self.settings.endGroup()
+        self.settings.endGroup()
         try:
             self.setRowCount(dbConnect.execute('SELECT count(DISTINCT base) from Games').fetchone()[0])
-            games = dbConnect.execute('SELECT * FROM Games GROUP BY base ORDER BY game').fetchall()
+            self.bases = dbConnect.execute('SELECT * FROM Games GROUP BY base ORDER BY game').fetchall()
             allGames = dbConnect.execute('SELECT * FROM Games ORDER BY game').fetchall()
             count = 0
-            self.bases = games
             filesArray = defaultdict(list)
             for game in allGames:
-                # game = allGames[i] 
                 if os.path.exists(game[5]):
                     self.games.append(game)
                     self.row_data.append(game)
-                    if game in games:
+                    if game in self.bases:
                         self.setItem(count, 0, QtWidgets.QTableWidgetItem(game[7]))
-                        # self.setItem(count, 1, QtWidgets.QTableWidgetItem(game[0] + " (" + str(game[3]) + ")"))
                         self.setItem(count, 1, QtWidgets.QTableWidgetItem(game[0]))
                         count = count + 1
                     fileNameSplit = game[5].split(os.sep)
                     fileName = fileNameSplit[len(fileNameSplit) - 1]
                     filesArray[game[0]].append(f"{fileName} - {game[2]}")
                 else:
+                    self.logger.debug(f"Removing {game}")
                     dbConnect.execute('DELETE FROM Games WHERE crc=?', (game[4],))
                     dbConnect.commit()
                     self.refresh()
                     break
-            for i in range(len(games)):
-                self.setItem(i, 2, QtWidgets.QTableWidgetItem(", ".join(filesArray[games[i][0]])))
+            for i in range(len(self.bases)):
+                self.setItem(i, 2, QtWidgets.QTableWidgetItem(", ".join(filesArray[self.bases[i][0]])))
             self.loadModpacks()
         except Exception as e:
-            logging.exception(e)
+            self.logger.exception(e)
         finally:
             dbConnect.close()
 
     def loadModpacks(self):
+        self.logger.info("Refreshing modpacks")
         match platform.system():
             case "Windows":
                 appData = os.getenv('APPDATA')
@@ -133,4 +159,5 @@ class GamesView(QtWidgets.QTableWidget):
             if row[2] == "modpack":
                 self.mods_view = ModsView(self)
                 edit = self.menu.addAction("Edit modpack", self.mods_view.openFile)
+                delete = self.menu.addAction("Remove modpack", self.mods_view.rmFile)
         return super().eventFilter(object, event)

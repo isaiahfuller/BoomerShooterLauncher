@@ -1,13 +1,21 @@
 import os
+import sys
 import sqlite3
 import platform 
+import logging
 from pathlib import Path
 
+logger = logging.getLogger("Database")
+if "--debug" in sys.argv:
+    logger.setLevel(logging.DEBUG)
+print(logger.level)
+
 def init():
+    logger.debug("Database init")
     try:
         con = connect()
-        con.execute('CREATE TABLE IF NOT EXISTS Games(base TEXT, name TEXT, version TEXT, year INTEGER, crc TEXT PRIMARY KEY, path TEXT, runners TEXT, game TEXT)')
-        con.execute('CREATE TABLE IF NOT EXISTS Runners(name TEXT PRIMARY KEY, game TEXT, path TEXT NOT NULL, executable TEXT NOT NULL)')
+        test1 = con.execute('CREATE TABLE IF NOT EXISTS Games(base TEXT, name TEXT, version TEXT, year INTEGER, crc TEXT PRIMARY KEY, path TEXT, runners TEXT, game TEXT)')
+        test2 = con.execute('CREATE TABLE IF NOT EXISTS Runners(name TEXT PRIMARY KEY, game TEXT, path TEXT NOT NULL, executable TEXT NOT NULL)')
     finally:
         con.close()
 
@@ -21,7 +29,7 @@ def connect():
     con = sqlite3.connect(os.fspath(path) + "/games.db")
     return con
 
-def addGame(gameInfo, tableRefresh, self):
+def addGame(gameInfo, self):
     c = connect()
     try:
         c.execute("INSERT INTO Games values (?, ?, ?, ?, ?, ?, ?, ?)", gameInfo)
@@ -30,4 +38,3 @@ def addGame(gameInfo, tableRefresh, self):
         print(e)
     finally: 
         c.close()
-    tableRefresh()

@@ -2,6 +2,7 @@ from PySide6 import QtCore, QtWidgets, QtGui
 from pathlib import Path
 import logging
 import os
+import sys
 import db
 import data
 import webbrowser
@@ -11,6 +12,16 @@ import subprocess
 class RunnerView(QtWidgets.QMainWindow):
     def __init__(self):
         super().__init__()
+        self.logger = logging.getLogger("Modpack Editor")
+        if "--debug" in sys.argv:
+            self.logger.setLevel(logging.DEBUG)
+
+        match platform.system():
+            case "Windows":
+                self.settings = QtCore.QSettings("fullerSpectrum", "Boomer Shooter Launcher")
+            case "Linux":
+                self.settings = QtCore.QSettings("BoomerShooterLauncher", "Boomer Shooter Launcher")
+
         self.boxLayout = QtWidgets.QVBoxLayout()
         self.openedFromMenu = False
 
@@ -48,17 +59,16 @@ class RunnerView(QtWidgets.QMainWindow):
 
     def showWindowFromMenu(self):
         self.openedFromMenu = True
-        self.showWindow("all", "all")
+        self.showWindow("all")
 
-    def showWindow(self, game, runner):
+    def showWindow(self, game):
         self.resize(400, 300)
-        self.builder(game, runner)
+        self.builder(game)
         self.show()
 
-    def builder(self, game, runner):
+    def builder(self, game):
         self.runnerList.clear()
         self.game = game
-        self.runner = runner
         if game == "all":
             try:
                 c = db.connect()
@@ -69,42 +79,36 @@ class RunnerView(QtWidgets.QMainWindow):
             for i in allRunners:
                 self.runnerList.addItem(f"{i[0]} [installed]")
             for i in data.runners:
-                for j in data.runners[i]:
-                    if not self.runnerList.findItems(j["name"], QtCore.Qt.MatchContains):
-                        self.runnerList.addItem(j["name"])
+                if not self.runnerList.findItems(i, QtCore.Qt.MatchContains):
+                    self.runnerList.addItem(i)
+            # self.runnerList.addItems(list(data.runners.keys()))
         else:
-            for i in data.runners[runner]:
-                if game in i["games"]:
-                    if not self.runnerList.findItems(i["name"], QtCore.Qt.MatchExactly):
-                        self.runnerList.addItem(i["name"])
+            for i in data.runners:
+                if game in data.runners[i]["games"]:
+                    if not self.runnerList.findItems(i, QtCore.Qt.MatchExactly):
+                        self.runnerList.addItem(i)
     
     def setRunner(self):
-        runners = []
         if "[installed]" in self.name:
             installed = True
         else:
             installed = False
         self.name = self.name.replace(" [installed]", "")
         for i in data.runners:
-            runners.append(i)
-        for j in runners:
-            for i in data.runners[j]:
-                if i["name"] == self.name:
-                    self.executable = i["executable"]
-                    self.runner = j
-                    self.descriptionLabel.setText("Description:\n" + i["description"])
-                    self.url = i["link"]
-                    self.downloadButton.setEnabled(True)
-                    if installed: self.selectInstalledButton.setEnabled(False)
-                    else: self.selectInstalledButton.setEnabled(True)
-                    break
+            if i == self.name:
+                self.executable = data.runners[i]["executable"]
+                self.descriptionLabel.setText("Description:\n" + data.runners[i]["description"])
+                self.url = data.runners[i]["link"]
+                self.downloadButton.setEnabled(True)
+                if installed: self.selectInstalledButton.setEnabled(False)
+                else: self.selectInstalledButton.setEnabled(True)
+                break
 
     def getDownloadLink(self):
         webbrowser.open(self.url)
 
     def updateText(self):
-        name = self.runnerList.currentItem().text()
-        self.name = name
+        self.name = self.runnerList.currentItem().text()
         self.setRunner()
 
     def addToDb(self):
@@ -122,16 +126,20 @@ class RunnerView(QtWidgets.QMainWindow):
         try:    
             if filePath.stem.strip() == self.executable:
                 insertQuery = "INSERT INTO Runners values (?, ?, ?, ?)"
-                insertData = (self.runnerList.selectedItems()[0].text(), self.runner, str(filePath).strip(), self.executable)
+                insertData = (self.runnerList.selectedItems()[0].text(), "blank", str(filePath).strip(), self.executable)
                 con.execute(insertQuery, insertData)
                 con.commit()
+                self.settings.beginGroup(f"Runners/{self.runnerList.selectedItems()[0].text()}")
+                self.settings.setValue("path", str(filePath).strip())
+                self.settings.setValue("executable", self.executable)
+                self.settings.endGroup()
         except Exception as e:
             logging.exception(e)
             logging.warning(f"[Runner List] Failed to add {self.runnerList.selectedItems()[0].text()} to db")
         finally:
             con.close()
             if len(os.fspath(filePath)) > 0:
-                self.builder(self.game, self.runner)
+                self.builder(self.game)
                 self.selectInstalledButton.setEnabled(False)
                 if not self.openedFromMenu: self.close()
 

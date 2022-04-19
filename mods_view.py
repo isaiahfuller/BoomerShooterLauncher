@@ -2,12 +2,22 @@ import json
 import os
 import platform
 import logging
+import sys
 from PySide6 import QtCore, QtWidgets, QtGui
 from pathlib import Path
 
 class ModsView(QtWidgets.QMainWindow):
     def __init__(self, games):
         super().__init__()
+
+        self.logger = logging.getLogger("Modpack Editor")
+        if "--debug" in sys.argv:
+            self.logger.setLevel(logging.DEBUG)
+        match platform.system():
+            case "Windows":
+                self.settings = QtCore.QSettings("fullerSpectrum", "Boomer Shooter Launcher")
+            case "Linux":
+                self.settings = QtCore.QSettings("BoomerShooterLauncher", "Boomer Shooter Launcher")
 
         self.mods = {
             "name": "Mod name",
@@ -182,7 +192,18 @@ class ModsView(QtWidgets.QMainWindow):
 
     def saveFile(self):
         name = self.mods["name"]
+        print(self.mods)
         if name != "":
+            self.settings.beginGroup(f"Modpacks/{name}")
+            self.settings.setValue("base", self.mods["base"])
+            self.settings.beginWriteArray("files")
+            for i in range(0,len(self.mods["files"])):
+                self.settings.setArrayIndex(i)
+                self.settings.setValue("name", self.mods["files"][i]["name"])
+                self.settings.setValue("path", self.mods["files"][i]["path"])
+                self.settings.setValue("source", self.mods["files"][i]["source"])
+            self.settings.endArray()
+            self.settings.endGroup()
             match platform.system():
                 case "Windows":
                     appData = os.getenv('APPDATA')
@@ -194,7 +215,7 @@ class ModsView(QtWidgets.QMainWindow):
             try:
                 with open(os.path.join(path, f"{name}.json"), "w+") as outfile:
                     outfile.write(json_string)
-                    logging.info(f"[Mod editor] Saved {name}.json")
+                    self.logger.info(f"[Mod editor] Saved {name}.json")
             finally:
                 outfile.close()
                 self.game_list.refresh()
@@ -219,7 +240,12 @@ class ModsView(QtWidgets.QMainWindow):
 
     def openFile(self):
         name = self.game_list.selectedItems()[1].text()
-        path = os.path.join(os.getenv('APPDATA'), "Boomer Shooter Launcher", "Modpacks", f"{name}.json")
+        match platform.system():
+            case "Windows":
+                appData = os.getenv('APPDATA')
+                path = Path(appData, "Boomer Shooter Launcher", "Modpacks", f"{name}.json")
+            case "Linux":
+                path = Path(Path.home(), ".config", "BoomerShooterLauncher", "Modpacks", f"{name}.json")
         file = open(path)
         json_data = json.load(file)
         self.name_edit.setText(json_data["name"])
@@ -233,3 +259,17 @@ class ModsView(QtWidgets.QMainWindow):
         self.mod_source_edit.setText(json_data["files"][0]["source"])
         self.mods = json_data
         self.showWindow()
+
+    def rmFile(self):
+        name = self.game_list.selectedItems()[1].text()
+        self.settings.remove(f"Modpacks/{name}")
+        self.logger.info(f"Removing {name}")
+        match platform.system():
+            case "Windows":
+                appData = os.getenv('APPDATA')
+                path = Path(appData, "Boomer Shooter Launcher", "Modpacks", f"{name}.json")
+            case "Linux":
+                path = Path(Path.home(), ".config", "BoomerShooterLauncher", "Modpacks", f"{name}.json")
+        os.remove(path)
+        self.logger.debug(f"Removed {path}")
+        self.game_list.refresh()
