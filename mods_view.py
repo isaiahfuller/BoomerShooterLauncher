@@ -7,8 +7,8 @@ from PySide6 import QtCore, QtWidgets, QtGui
 from pathlib import Path
 
 class ModsView(QtWidgets.QMainWindow):
-    def __init__(self, games):
-        super().__init__()
+    def __init__(self, parent):
+        super().__init__(parent=parent)
 
         self.logger = logging.getLogger("Modpack Editor")
         match platform.system():
@@ -25,8 +25,8 @@ class ModsView(QtWidgets.QMainWindow):
 
         self.setWindowTitle("Modpack Builder")
 
-        self.game_list = games
-        self.games = games.games
+        self.game_list = parent.game_list
+        self.games = self.game_list.games
         self.bases = []
 
         main_layout = QtWidgets.QVBoxLayout()

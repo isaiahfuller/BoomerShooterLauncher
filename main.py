@@ -37,9 +37,9 @@ class MainWindow(QtWidgets.QMainWindow):
         #         print(self.settings.childKeys())
         self.discord = Discord()
         
-        self.runner_list = RunnerView()
+        self.runner_list = RunnerView(self)
         self.game_list = GamesView(self.runner_list)
-        self.process = GameLauncher()
+        self.process = GameLauncher(self)
         self.discord_timer = QtCore.QTimer()
         self.discord_details = ""
         self.discord_state = ""
@@ -97,6 +97,8 @@ class MainWindow(QtWidgets.QMainWindow):
         self.launch_button.clicked.connect(self.launchGame)
         self.game_list.cellActivated.connect(self.launchGame)
 
+        # self.runner_list.close.connect(self.getRunners)
+
         self.discord_timer.start(30 * 1000)
         self.discord_timer.timeout.connect(self.updateDiscordStatus)
         self.process.finished.connect(self.clearDiscordStatus)
@@ -122,7 +124,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.settings.endGroup()
 
     def gameScanner(self):
-        scanner = GameScanner()
+        scanner = GameScanner(self)
         if scanner.exec():
             files = scanner.selectedFiles()
             scanner.crc(files[0], self.game_list.refresh)
@@ -237,7 +239,7 @@ class MainWindow(QtWidgets.QMainWindow):
             c.close()
         
     def showModWindow(self):
-        self.mod_list = ModsView(self.game_list)  
+        self.mod_list = ModsView(self)  
         self.mod_list.showWindow()
     
     def dragEnterEvent(self, event):
@@ -247,7 +249,7 @@ class MainWindow(QtWidgets.QMainWindow):
             event.ignore()
 
     def dropEvent(self, event):
-        scanner = GameScanner()
+        scanner = GameScanner(self)
         files = [u.toLocalFile() for u in event.mimeData().urls()]
         for path in files:
             scanner.directoryCrawl(path, self.game_list.refresh)
