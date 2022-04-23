@@ -39,7 +39,7 @@ class MainWindow(QtWidgets.QMainWindow):
         
         self.runner_list = RunnerView()
         self.game_list = GamesView(self.runner_list)
-        self.process = GameLauncher()
+        self.process = GameLauncher(self)
         self.discord_timer = QtCore.QTimer()
         self.discord_details = ""
         self.discord_state = ""
@@ -137,23 +137,19 @@ class MainWindow(QtWidgets.QMainWindow):
             game = self.game_list.bases[i][7]
             self.runner = runner 
             self.game = game
-            try:
-                # query = "SELECT name FROM Runners WHERE game=?"
-                # res = c.execute(query, (runner,)).fetchall()
-                self.settings.beginGroup("Runners")
-                res = self.settings.childGroups()
-                self.settings.endGroup()
-            finally:
-                c.close()
-            if len(res) == 0:
-                self.runner_combobox.addItem("Add source port")
+            self.settings.beginGroup("Runners")
+            res = self.settings.childGroups()
+            self.settings.endGroup()
+            for x in res:
+                for y in data.runners:
+                    if game in data.runners[y]["games"] and x in y:
+                        self.current_runners.append(x)
+            self.logger.debug(f"Compatible runners for \"{game}\": {self.current_runners}")
+            if(len(self.current_runners)) == 0:
+                self.runner_combobox.adjustSize()
                 self.runner_combobox.setEnabled(False)
+                self.runner_combobox.addItem("Add source port")
             else:
-                for x in res:
-                    for y in data.runners:
-                        if game in data.runners[y]["games"] and x in y:
-                            self.current_runners.append(x)
-                self.logger.debug(f"Compatible runners for {game}: {self.current_runners}")
                 self.runner_combobox.adjustSize()
                 self.runner_combobox.addItems(self.current_runners)
                 self.runner_combobox.setEnabled(True)
@@ -163,26 +159,44 @@ class MainWindow(QtWidgets.QMainWindow):
             self.runner_combobox.addItem("Select a game first")
 
     def getVersions(self):
-        c = db.connect()
+        # c = db.connect()
         self.current_versions.clear()
         self.version_combobox.clear()
         if(self.game_list.selectedIndexes()):
-            try:
-                if "(Modded)" in self.game_list.selectedItems()[0].text():
-                    game = self.game_list.selectedItems()[0].text().replace(" (Modded)", "")
-                    query = "SELECT version, path, name FROM Games WHERE game = ? ORDER BY name"
-                    res = c.execute(query, (game,)).fetchall()
-                else:
-                    game = self.game_list.selectedItems()[1].text()
-                    query = "SELECT version, path, name FROM Games WHERE base = ? ORDER BY name"
-                    res = c.execute(query, (game,)).fetchall()
-            finally:
-                c.close()
+            # try:
+            #     if "(Modded)" in self.game_list.selectedItems()[0].text():
+            #         game = self.game_list.selectedItems()[0].text().replace(" (Modded)", "")
+            #         query = "SELECT version, path, name FROM Games WHERE game = ? ORDER BY name"
+            #         res = c.execute(query, (game,)).fetchall()
+            #     else:
+            #         game = self.game_list.selectedItems()[1].text()
+            #         query = "SELECT version, path, name FROM Games WHERE base = ? ORDER BY name"
+            #         res = c.execute(query, (game,)).fetchall()
+            # finally:
+            #     c.close()
+            self.settings.beginGroup("Games")
+            bases = self.settings.childGroups()
+            res = []
+            if "(Modded)" in self.game_list.selectedItems()[0].text():
+                game = self.game_list.selectedItems()[0].text().replace(" (Modded)", "")
+                for i in bases:
+                    self.settings.beginGroup(i)
+                    for j in self.settings.childGroups():
+                        if self.settings.value(f"{j}/game") == game:
+                            res.append(j)
+                    self.settings.endGroup()
+            else:
+                game = self.game_list.selectedItems()[1].text()
+                self.settings.beginGroup(game)
+                res = self.settings.childGroups()
+                self.settings.endGroup()
+            self.settings.endGroup()
             for x in res:
-                self.current_versions.append(x[2])
+                self.current_versions.append(x)
             self.version_combobox.adjustSize()
             self.version_combobox.addItems(self.current_versions)
             self.version_combobox.setEnabled(True)
+            self.logger.debug(f"\"{game}\" versions: {res}")
         else:
             self.version_combobox.adjustSize()
             self.version_combobox.setEnabled(False)
@@ -197,7 +211,7 @@ class MainWindow(QtWidgets.QMainWindow):
             runner_query = "SELECT * from Runners WHERE name = ?"
             game_data = c.execute(game_query, (version_text,)).fetchone()
             game = game_data[0]
-            if self.runner_text == "Add source port":
+            if len(self.current_runners) == 0:
                 self.runner_list.showWindow(self.game)
             else:
                 self.original_path = os.getcwd()

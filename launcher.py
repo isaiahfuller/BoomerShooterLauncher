@@ -5,8 +5,8 @@ import platform
 from PySide6 import QtCore
 
 class GameLauncher(QtCore.QProcess):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, parent):
+        super().__init__(parent=parent)
         self.logger = logging.getLogger("Game Scanner")
         match platform.system():    
             case "Windows":
