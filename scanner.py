@@ -9,8 +9,8 @@ from pathlib import Path
 from PySide6 import QtWidgets, QtCore
 
 class GameScanner(QtWidgets.QFileDialog):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, parent):
+        super().__init__(parent=parent)
         db.init()
         self.logger = logging.getLogger("Game Scanner")
         match platform.system():    

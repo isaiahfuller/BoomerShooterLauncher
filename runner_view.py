@@ -10,9 +10,10 @@ import platform
 import subprocess
 
 class RunnerView(QtWidgets.QMainWindow):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, parent):
+        super().__init__(parent=parent)
         self.logger = logging.getLogger("Modpack Editor")
+        print(parent)
 
         match platform.system():
             case "Windows":
@@ -50,7 +51,7 @@ class RunnerView(QtWidgets.QMainWindow):
 
         self.boxLayout.addLayout(self.buttonBox)
 
-        self.runnerDialog = QtWidgets.QFileDialog(self)
+        self.runnerDialog = QtWidgets.QFileDialog(parent=self)
 
         self.setCentralWidget(self.scroll)
         self.setWindowTitle("Source Ports")
@@ -67,19 +68,28 @@ class RunnerView(QtWidgets.QMainWindow):
     def builder(self, game):
         self.runnerList.clear()
         self.game = game
+        # if game == "all":
+        #     try:
+        #         c = db.connect()
+        #         query = "SELECT * FROM Runners"
+        #         allRunners = c.execute(query).fetchall()
+        #     finally:
+        #         c.close()
+        #     for i in allRunners:
+        #         self.runnerList.addItem(f"{i[0]} [installed]")
+        #     for i in data.runners:
+        #         if not self.runnerList.findItems(i, QtCore.Qt.MatchContains):
+        #             self.runnerList.addItem(i)
+        #     # self.runnerList.addItems(list(data.runners.keys()))
         if game == "all":
-            try:
-                c = db.connect()
-                query = "SELECT * FROM Runners"
-                allRunners = c.execute(query).fetchall()
-            finally:
-                c.close()
+            self.settings.beginGroup("Runners")
+            allRunners = self.settings.childGroups()
+            self.settings.endGroup()
             for i in allRunners:
-                self.runnerList.addItem(f"{i[0]} [installed]")
+                self.runnerList.addItem(f"{i} [installed]")
             for i in data.runners:
                 if not self.runnerList.findItems(i, QtCore.Qt.MatchContains):
                     self.runnerList.addItem(i)
-            # self.runnerList.addItems(list(data.runners.keys()))
         else:
             for i in data.runners:
                 if game in data.runners[i]["games"]:
@@ -122,7 +132,7 @@ class RunnerView(QtWidgets.QMainWindow):
                 file = subprocess.run(["which", exe], stdout=subprocess.PIPE)
                 filePath = Path(file.stdout.decode("utf-8"))
         try:    
-            if filePath.stem.strip() == self.executable:
+            if Path(filePath).stem.strip() == self.executable:
                 insertQuery = "INSERT INTO Runners values (?, ?, ?, ?)"
                 insertData = (self.runnerList.selectedItems()[0].text(), "blank", str(filePath).strip(), self.executable)
                 con.execute(insertQuery, insertData)
@@ -144,4 +154,5 @@ class RunnerView(QtWidgets.QMainWindow):
     def closeEvent(self, event: QtGui.QCloseEvent) -> None:
         self.runnerList.clear()
         self.openedFromMenu = False
+        self.parent().getRunners()
         return super().closeEvent(event)
