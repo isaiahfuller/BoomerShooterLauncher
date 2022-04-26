@@ -58,7 +58,6 @@ class GamesView(QtWidgets.QTableWidget):
         dbConnect = db.connect()
         self.settings.beginGroup("Games")
         self.setRowCount(len(self.settings.childGroups()))
-        # filesArray = defaultdict(list)
         for i, base in enumerate(self.settings.childGroups(),start=0):
             self.settings.beginGroup(base)
             filesArray = []
@@ -75,30 +74,18 @@ class GamesView(QtWidgets.QTableWidget):
             self.settings.endGroup()
         self.settings.endGroup()
         try:
-            # self.setRowCount(dbConnect.execute('SELECT count(DISTINCT base) from Games').fetchone()[0])
             self.bases = dbConnect.execute('SELECT * FROM Games GROUP BY base ORDER BY game').fetchall()
             allGames = dbConnect.execute('SELECT * FROM Games ORDER BY game').fetchall()
-            # count = 0
             for game in allGames:
                 if os.path.exists(game[5]):
                     self.games.append(game)
                     self.row_data.append(game)
-                    # if game in self.bases:
-                        # self.setItem(count, 0, QtWidgets.QTableWidgetItem(game[7]))
-                        # self.setItem(count, 1, QtWidgets.QTableWidgetItem(game[0]))
-                        # count = count + 1
-                    # fileNameSplit = game[5].split(os.sep)
-                    # fileName = fileNameSplit[len(fileNameSplit) - 1]
-                    # filesArray[game[0]].append(f"{fileName} - {game[2]}")
                 else:
                     self.logger.debug(f"Removing {game}")
                     dbConnect.execute('DELETE FROM Games WHERE crc=?', (game[4],))
                     dbConnect.commit()
                     self.refresh()
                     break
-            # for i in range(len(self.bases)):
-            #     self.setItem(i, 2, QtWidgets.QTableWidgetItem(", ".join(filesArray[self.bases[i][0]])))
-            #     print(filesArray)
             self.loadModpacks()
             self.sortItems(0, order=QtCore.Qt.AscendingOrder)
         except Exception as e:

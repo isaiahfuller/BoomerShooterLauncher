@@ -190,7 +190,6 @@ class ModsView(QtWidgets.QMainWindow):
 
     def saveFile(self):
         name = self.mods["name"]
-        print(self.mods)
         if name != "":
             self.settings.beginGroup(f"Modpacks/{name}")
             self.settings.setValue("base", self.mods["base"])

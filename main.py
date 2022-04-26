@@ -28,13 +28,6 @@ class MainWindow(QtWidgets.QMainWindow):
                 self.settings = QtCore.QSettings("BoomerShooterLauncher", "Boomer Shooter Launcher")
 
         self.readSettings()
-        # self.settings.beginGroup("Games")
-        # for group in self.settings.childGroups():
-        #     self.settings.beginGroup(group)
-        #     print(group)
-        #     for crc in self.settings.childGroups():
-        #         self.settings.beginGroup(crc)
-        #         print(self.settings.childKeys())
         self.discord = Discord()
         
         self.runner_list = RunnerView(self)
@@ -61,19 +54,10 @@ class MainWindow(QtWidgets.QMainWindow):
         self.runner_toolbar = self.addToolBar("Launcher")
         file_toolbar.setMovable(False)
 
-        # menu_bar = QtWidgets.QMenuBar()
-        # file_menu = QtWidgets.QMenu("&File")
-
-        # if self.platform == "Windows":
         file_toolbar.addAction("&Add Runners", self.runner_list.showWindowFromMenu)
         file_toolbar.addAction("&Add Games", self.gameScanner)
         file_toolbar.addAction("&Add Modpack", self.showModWindow)
         file_toolbar.addAction("&R", self.game_list.refresh)
-
-        # file_menu.addAction("&Add Games", self.gameScanner)
-        # file_menu.addAction("&Manage Ports", self.runner_list.showWindowFromMenu)
-        # menu_bar.addMenu(file_menu)
-        # self.setMenuBar(menu_bar)
         
         self.runner_combobox = QtWidgets.QComboBox()
         self.runner_combobox.addItem("Select a game first")
@@ -96,8 +80,6 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self.launch_button.clicked.connect(self.launchGame)
         self.game_list.cellActivated.connect(self.launchGame)
-
-        # self.runner_list.close.connect(self.getRunners)
 
         self.discord_timer.start(30 * 1000)
         self.discord_timer.timeout.connect(self.updateDiscordStatus)
@@ -165,17 +147,6 @@ class MainWindow(QtWidgets.QMainWindow):
         self.current_versions.clear()
         self.version_combobox.clear()
         if(self.game_list.selectedIndexes()):
-            # try:
-            #     if "(Modded)" in self.game_list.selectedItems()[0].text():
-            #         game = self.game_list.selectedItems()[0].text().replace(" (Modded)", "")
-            #         query = "SELECT version, path, name FROM Games WHERE game = ? ORDER BY name"
-            #         res = c.execute(query, (game,)).fetchall()
-            #     else:
-            #         game = self.game_list.selectedItems()[1].text()
-            #         query = "SELECT version, path, name FROM Games WHERE base = ? ORDER BY name"
-            #         res = c.execute(query, (game,)).fetchall()
-            # finally:
-            #     c.close()
             self.settings.beginGroup("Games")
             bases = self.settings.childGroups()
             res = []

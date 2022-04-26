@@ -72,8 +72,6 @@ class GameScanner(QtWidgets.QFileDialog):
                         db.addGame(gameInfo, self)
                         self.logger.debug(f"{gameFileName} crc {crc} doesn't match")
                     self.settings.beginGroup(f"Games/{gameInfo[0]}/{gameInfo[1]}")
-                    # self.settings.setValue("base", gameInfo[0])
-                    # self.settings.setValue("name", gameInfo[1])
                     self.settings.setValue("version", gameInfo[2])
                     self.settings.setValue("year", gameInfo[3])
                     self.settings.setValue("crc", gameInfo[4])
