@@ -177,7 +177,13 @@ class MainWindow(QtWidgets.QMainWindow):
     def launchGame(self):
         version_text = self.version_combobox.currentText()
         self.runner_text = self.runner_combobox.currentText()
-        self.settings.beginGroup(f"Games/{self.game}/{version_text}")
+        if "(Modded)" not in self.game_list.selectedItems()[0].text():
+            game = self.game_list.selectedItems()[1].text()
+        else:
+            game = self.game
+        self.settings.beginGroup(f"Games/{game}/{version_text}")
+        print(self.settings.childKeys())
+        print(game)
         try:
             game = self.settings.value("path")
             if len(self.current_runners) == 0:
