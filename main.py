@@ -143,7 +143,6 @@ class MainWindow(QtWidgets.QMainWindow):
             self.runner_combobox.addItem("Select a game first")
 
     def getVersions(self):
-        # c = db.connect()
         self.current_versions.clear()
         self.version_combobox.clear()
         if(self.game_list.selectedIndexes()):
@@ -178,21 +177,17 @@ class MainWindow(QtWidgets.QMainWindow):
     def launchGame(self):
         version_text = self.version_combobox.currentText()
         self.runner_text = self.runner_combobox.currentText()
-        c = db.connect()
+        self.settings.beginGroup(f"Games/{self.game}/{version_text}")
         try:
-            game_query = "SELECT path, runners from Games WHERE name = ?"
-            runner_query = "SELECT * from Runners WHERE name = ?"
-            game_data = c.execute(game_query, (version_text,)).fetchone()
-            game = game_data[0]
+            game = self.settings.value("path")
             if len(self.current_runners) == 0:
                 self.runner_list.showWindow(self.game)
             else:
                 self.original_path = os.getcwd()
-                runner = c.execute(runner_query, (self.runner_text,)).fetchone()
                 if "(Modded)" in self.game_list.selectedItems()[0].text():
-                    run = self.process.runGame(self.game, game, runner, self.game_list.files)
+                    self.process.runGame(self.game, game, self.runner_text, self.game_list.files)
                 else:
-                    run = self.process.runGame(self.game, game, runner, [])
+                    self.process.runGame(self.game, game, self.runner_text, [])
                 self.discord_details = f"Playing {self.game_list.game} with {self.runner_text}"
                 self.discord_state = version_text
                 self.game_running = True
@@ -201,7 +196,7 @@ class MainWindow(QtWidgets.QMainWindow):
             self.logger.exception(e)
             self.logger.error("Failed to launch game")
         finally:
-            c.close()
+            self.settings.endGroup()
         
     def showModWindow(self):
         self.mod_list = ModsView(self)  

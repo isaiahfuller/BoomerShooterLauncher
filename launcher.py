@@ -2,7 +2,7 @@ import os
 import logging
 import sys 
 import platform
-from PySide6 import QtCore
+from PySide6 import QtCore, QtWidgets
 from pathlib import Path
 
 class GameLauncher(QtCore.QProcess):
@@ -14,17 +14,21 @@ class GameLauncher(QtCore.QProcess):
                 self.settings = QtCore.QSettings("fullerSpectrum", "Boomer Shooter Launcher")
             case "Linux":
                 self.settings = QtCore.QSettings("BoomerShooterLauncher", "Boomer Shooter Launcher")
+        self.finished.connect(self.processFinished)
 
     def runGame(self, game, game_path, runner, other_files):
+        self.runner = runner
         self.logger.debug(f"Game: {game} @ {game_path}")
         self.logger.debug(f"Runner: {runner}")
         self.logger.debug(f"Other files: {other_files}")
-        runner_path = str(runner[2]).split("/")
-        runner_path.pop(len(runner_path) - 1)
-        runner_path = os.path.realpath("/".join(runner_path))
-        game_dir = str(game_path).split("\\")
+        runner_path = Path(self.settings.value(f"Runners/{runner}/path"))
+        # runner_path = str(runner[2]).split("/")
+        # runner_path.pop(len(runner_path) - 1)
+        # runner_path = os.path.realpath("/".join(runner_path))
+        game_dir = str(game_path).split(os.sep)
         game_dir.pop(len(game_dir) - 1)
-        game_dir = os.path.realpath("/".join(game_dir))
+        game_dir = Path("/".join(game_dir))
+        print(game_dir)
         spArray = [""]*3
         if game in ["Duke Nukem 3D", "Ion Fury"]:
             spArray = [str(runner[2]), "-usecwd", "-nosetup",
@@ -33,22 +37,27 @@ class GameLauncher(QtCore.QProcess):
                 spArray.append("-file")
                 spArray.append(i)
         else:
-            spArray = [str(runner[2]), "-iwad", game_path]
+            spArray = [str(runner_path), "-iwad", game_path]
             for i in other_files:
                 spArray.append("-file")
                 spArray.append(i)
-            if runner[0] == "Chocolate Doom":
+            if runner == "Chocolate Doom":
                 mouse = open('./MOUSE.CFG')
                 spArray.append("-config")
-                spArray.append(os.path.realpath(mouse.name))
-        # return (spArray, runner_path)
-        # print(runner)
+                spArray.append(str(Path(mouse.name).resolve()))
         match platform.system():
             case "Windows": run_path = spArray[1]
-            case "Linux": run_path = Path(Path.home(), ".local", "share", "Boomer Shooter Launcher", runner[0], game)
+            case "Linux": run_path = Path(Path.home(), ".local", "share", "Boomer Shooter Launcher", runner, self.parent().game_list.game)
         spArray.append("-savedir")
         spArray.append(str(run_path))
         os.makedirs(run_path, exist_ok=True)
         os.chdir(run_path)
         self.logger.debug(f"Array: {spArray}")
         self.start(spArray[0], spArray[1:])
+    
+    def processFinished(self, exitCode):
+        self.logger.info("Game closed")
+        if exitCode != 0:
+            errorWindow = QtWidgets.QErrorMessage(parent=self.parent())
+            errorWindow.showMessage(f"{self.runner} crashed (Code {exitCode}). Double check your runner and game version if modded.")
+            self.logger.error(f"{self.runner} crashed. (Code {exitCode})")
