@@ -3,7 +3,6 @@ from pathlib import Path
 import logging
 import os
 import sys
-import db
 import data
 import webbrowser
 import platform
@@ -120,9 +119,7 @@ class RunnerView(QtWidgets.QMainWindow):
         self.setRunner()
 
     def addToDb(self):
-        db.init()
         self.runnerDialog.setFileMode(QtWidgets.QFileDialog.ExistingFile)
-        con = db.connect()
         match platform.system():
             case "Windows":
                 files = self.runnerDialog.getOpenFileUrl()
@@ -133,10 +130,6 @@ class RunnerView(QtWidgets.QMainWindow):
                 filePath = Path(file.stdout.decode("utf-8"))
         try:    
             if Path(filePath).stem.strip() == self.executable:
-                insertQuery = "INSERT INTO Runners values (?, ?, ?, ?)"
-                insertData = (self.runnerList.selectedItems()[0].text(), "blank", str(filePath).strip(), self.executable)
-                con.execute(insertQuery, insertData)
-                con.commit()
                 self.settings.beginGroup(f"Runners/{self.runnerList.selectedItems()[0].text()}")
                 self.settings.setValue("path", str(filePath).strip())
                 self.settings.setValue("executable", self.executable)
@@ -145,7 +138,6 @@ class RunnerView(QtWidgets.QMainWindow):
             logging.exception(e)
             logging.warning(f"[Runner List] Failed to add {self.runnerList.selectedItems()[0].text()} to db")
         finally:
-            con.close()
             if len(os.fspath(filePath)) > 0:
                 self.builder(self.game)
                 self.selectInstalledButton.setEnabled(False)

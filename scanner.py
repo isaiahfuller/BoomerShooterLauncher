@@ -1,6 +1,6 @@
 import sys
 import zlib
-import db
+# import db
 import os
 import data
 import platform
@@ -11,7 +11,6 @@ from PySide6 import QtWidgets, QtCore
 class GameScanner(QtWidgets.QFileDialog):
     def __init__(self, parent):
         super().__init__(parent=parent)
-        db.init()
         self.logger = logging.getLogger("Game Scanner")
         match platform.system():    
             case "Windows":
@@ -61,7 +60,6 @@ class GameScanner(QtWidgets.QFileDialog):
                             else:
                                 name = game["name"]
                             gameInfo = (base, name, i["version"], game["year"], crc, fileName, game["runner"], game["game"])
-                            db.addGame(gameInfo, self)
                             found = True
                             self.logger.debug(f"{gameFileName} crc {crc} matches")
                             break
@@ -69,14 +67,14 @@ class GameScanner(QtWidgets.QFileDialog):
                         name = game["name"]
                         base = name
                         gameInfo = (name, f"{name} vUnk-{crc}", crc, game["year"], crc, fileName, game["runner"], game["game"])
-                        db.addGame(gameInfo, self)
                         self.logger.debug(f"{gameFileName} crc {crc} doesn't match")
-                    self.settings.beginGroup(f"Games/{gameInfo[0]}/{gameInfo[1]}")
+                    self.settings.beginGroup(f"Games/{gameInfo[0]}")
+                    self.settings.beginGroup(gameInfo[1])
                     self.settings.setValue("version", gameInfo[2])
-                    self.settings.setValue("year", gameInfo[3])
                     self.settings.setValue("crc", gameInfo[4])
                     self.settings.setValue("path", gameInfo[5])
-                    self.settings.setValue("runner", gameInfo[6])
+                    self.settings.endGroup()
+                    self.settings.setValue("year", gameInfo[3])
                     self.settings.setValue("game", gameInfo[7])
                     self.settings.endGroup()
                     self.logger.info(f"Added {gameInfo[0]}: {gameInfo[1]} from {gameInfo[5]}")

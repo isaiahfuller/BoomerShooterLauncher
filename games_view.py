@@ -1,5 +1,4 @@
 import sys
-import db
 import os
 import json
 import platform
@@ -55,15 +54,14 @@ class GamesView(QtWidgets.QTableWidget):
         self.games.clear()
         self.row_data.clear()
         self.clearContents()
-        dbConnect = db.connect()
         self.settings.beginGroup("Games")
         self.setRowCount(len(self.settings.childGroups()))
         for i, base in enumerate(self.settings.childGroups(),start=0):
             self.settings.beginGroup(base)
             filesArray = []
             for j, game in enumerate(self.settings.childGroups(), start=0):
-                self.settings.beginGroup(game)
                 self.setItem(i,0,QtWidgets.QTableWidgetItem(self.settings.value("game")))
+                self.settings.beginGroup(game)
                 self.setItem(i,1,QtWidgets.QTableWidgetItem(base))
                 fileNameSplit = self.settings.value("path").split(os.sep)
                 fileName = fileNameSplit[len(fileNameSplit) - 1]
@@ -73,25 +71,26 @@ class GamesView(QtWidgets.QTableWidget):
             self.setItem(i, 2, QtWidgets.QTableWidgetItem(", ".join(filesArray)))
             self.settings.endGroup()
         self.settings.endGroup()
-        try:
-            self.bases = dbConnect.execute('SELECT * FROM Games GROUP BY base ORDER BY game').fetchall()
-            allGames = dbConnect.execute('SELECT * FROM Games ORDER BY game').fetchall()
-            for game in allGames:
-                if os.path.exists(game[5]):
-                    self.games.append(game)
-                    self.row_data.append(game)
-                else:
-                    self.logger.debug(f"Removing {game}")
-                    dbConnect.execute('DELETE FROM Games WHERE crc=?', (game[4],))
-                    dbConnect.commit()
-                    self.refresh()
-                    break
-            self.loadModpacks()
-            self.sortItems(0, order=QtCore.Qt.AscendingOrder)
-        except Exception as e:
-            self.logger.exception(e)
-        finally:
-            dbConnect.close()
+        self.loadModpacks()
+        # try:
+        #     self.bases = dbConnect.execute('SELECT * FROM Games GROUP BY base ORDER BY game').fetchall()
+        #     allGames = dbConnect.execute('SELECT * FROM Games ORDER BY game').fetchall()
+        #     for game in allGames:
+        #         if os.path.exists(game[5]):
+        #             self.games.append(game)
+        #             self.row_data.append(game)
+        #         else:
+        #             self.logger.debug(f"Removing {game}")
+        #             dbConnect.execute('DELETE FROM Games WHERE crc=?', (game[4],))
+        #             dbConnect.commit()
+        #             self.refresh()
+        #             break
+        #     self.loadModpacks()
+        #     self.sortItems(0, order=QtCore.Qt.AscendingOrder)
+        # except Exception as e:
+        #     self.logger.exception(e)
+        # finally:
+        #     dbConnect.close()
 
     def loadModpacks(self):
         self.logger.info("Refreshing modpacks")
@@ -122,13 +121,16 @@ class GamesView(QtWidgets.QTableWidget):
     def updateRow(self):
         if self.selectedItems():
             self.game = self.selectedItems()[1].text()
-            for i in range(len(self.bases)):
-                if self.selectedItems()[0].text().replace(" (Modded)", "") == self.bases[i][7]:
+            self.settings.beginGroup("Games")
+            bases = self.settings.childGroups()
+            for i in range(len(bases)):
+                category = self.settings.value(f"{bases[i]}/game")
+                if self.selectedItems()[0].text().replace(" (Modded)", "") == category:
                     self.selected_row = i
                     self.modpack_selected = True
                     self.files = self.selectedItems()[2].text().split(", ")
                     break
-                elif self.selectedItems()[0].text() == self.bases[i][7]:
+                elif self.selectedItems()[0].text() == category:
                     self.selected_row = i
                     self.modpack_selected = False
                     self.files.clear()

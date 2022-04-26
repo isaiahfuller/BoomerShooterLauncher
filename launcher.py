@@ -31,8 +31,8 @@ class GameLauncher(QtCore.QProcess):
         print(game_dir)
         spArray = [""]*3
         if game in ["Duke Nukem 3D", "Ion Fury"]:
-            spArray = [str(runner[2]), "-usecwd", "-nosetup",
-                    "-gamegrp", game_path, "-game_dir", game_dir]
+            spArray = [str(runner_path), "-usecwd", "-nosetup",
+                    "-gamegrp", game_path, "-game_dir", str(game_dir)]
             for i in other_files:
                 spArray.append("-file")
                 spArray.append(i)

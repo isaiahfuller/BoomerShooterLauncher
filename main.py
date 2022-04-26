@@ -1,5 +1,4 @@
 import sys
-import db
 import data
 import platform
 from discord import Discord
@@ -14,7 +13,6 @@ from launcher import *
 class MainWindow(QtWidgets.QMainWindow):
     def __init__(self):
         super().__init__()
-        db.init()
         self.logger = logging.getLogger("Main window")
         if "--debug" in sys.argv:
             self.logger.setLevel(logging.DEBUG)
@@ -112,14 +110,13 @@ class MainWindow(QtWidgets.QMainWindow):
             scanner.crc(files[0], self.game_list.refresh)
     
     def getRunners(self):
-        c = db.connect()
         self.current_runners.clear()
         self.runner_combobox.clear()
         if(self.game_list.selectedIndexes()):
-            i = self.game_list.selected_row
-            runner = self.game_list.bases[i][6]
-            game = self.game_list.bases[i][7]
-            self.runner = runner 
+            # i = self.game_list.selected_row
+            # game = self.game_list.bases[i][7]
+            game = self.game_list.selectedItems()[0].text().replace(" (Modded)","")
+            
             self.game = game
             self.settings.beginGroup("Runners")
             res = self.settings.childGroups()
@@ -152,11 +149,15 @@ class MainWindow(QtWidgets.QMainWindow):
             if "(Modded)" in self.game_list.selectedItems()[0].text():
                 game = self.game_list.selectedItems()[0].text().replace(" (Modded)", "")
                 for i in bases:
-                    self.settings.beginGroup(i)
-                    for j in self.settings.childGroups():
-                        if self.settings.value(f"{j}/game") == game:
-                            res.append(j)
-                    self.settings.endGroup()
+                    if self.settings.value(f"{i}/game") == game:
+                        self.settings.beginGroup(i)
+                        res = res + self.settings.childGroups()
+                        self.settings.endGroup()
+                    # self.settings.beginGroup(i)
+                    # for j in self.settings.childGroups():
+                    #     if self.settings.value(f"{j}/game") == game:
+                    #         res.append(j)
+                    # self.settings.endGroup()
             else:
                 game = self.game_list.selectedItems()[1].text()
                 self.settings.beginGroup(game)
