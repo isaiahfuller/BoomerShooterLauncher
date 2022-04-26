@@ -3,6 +3,7 @@ import logging
 import sys 
 import platform
 from PySide6 import QtCore
+from pathlib import Path
 
 class GameLauncher(QtCore.QProcess):
     def __init__(self, parent):
@@ -25,7 +26,13 @@ class GameLauncher(QtCore.QProcess):
         game_dir.pop(len(game_dir) - 1)
         game_dir = os.path.realpath("/".join(game_dir))
         spArray = [""]*3
-        if runner[1] == "doom":
+        if game in ["Duke Nukem 3D", "Ion Fury"]:
+            spArray = [str(runner[2]), "-usecwd", "-nosetup",
+                    "-gamegrp", game_path, "-game_dir", game_dir]
+            for i in other_files:
+                spArray.append("-file")
+                spArray.append(i)
+        else:
             spArray = [str(runner[2]), "-iwad", game_path]
             for i in other_files:
                 spArray.append("-file")
@@ -34,11 +41,14 @@ class GameLauncher(QtCore.QProcess):
                 mouse = open('./MOUSE.CFG')
                 spArray.append("-config")
                 spArray.append(os.path.realpath(mouse.name))
-        if runner[1] == "build":
-            if game in ["Duke Nukem 3D", "Ion Fury"]:
-                spArray = [str(runner[2]), "-usecwd", "-nosetup",
-                        "-gamegrp", game_path, "-game_dir", game_dir]
-                for i in other_files:
-                    spArray.append("-file")
-                    spArray.append(i)
-        return (spArray, runner_path)
+        # return (spArray, runner_path)
+        # print(runner)
+        match platform.system():
+            case "Windows": run_path = spArray[1]
+            case "Linux": run_path = Path(Path.home(), ".local", "share", "Boomer Shooter Launcher", runner[0], game)
+        spArray.append("-savedir")
+        spArray.append(str(run_path))
+        os.makedirs(run_path, exist_ok=True)
+        os.chdir(run_path)
+        self.logger.debug(f"Array: {spArray}")
+        self.start(spArray[0], spArray[1:])

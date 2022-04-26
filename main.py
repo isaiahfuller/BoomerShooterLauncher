@@ -222,26 +222,6 @@ class MainWindow(QtWidgets.QMainWindow):
                     run = self.process.runGame(self.game, game, runner, self.game_list.files)
                 else:
                     run = self.process.runGame(self.game, game, runner, [])
-                match self.platform:
-                    case "Windows": run_path = run[1]
-                    case "Linux": run_path = Path(Path.home(), ".config", runner[3])
-                if self.runner_text in ["Chocolate Doom", "Crispy Doom"]:
-                    match self.platform:
-                        case "Windows": run_path = os.path.join(run[1], self.game_list.game)
-                        case "Linux": run_path = Path(Path.home(), ".local", "share", runner[3], self.game_list.game)
-                    run[0].append("-savedir")
-                    run[0].append(str(run_path))
-                    os.makedirs(run_path, exist_ok=True)
-                else:
-                    run_path = Path(run_path, self.game_list.game)
-                    os.makedirs(run_path, exist_ok=True)
-                    run[0].append("-savedir")
-                    run[0].append(str(run_path))
-                os.chdir(run_path)
-                spArray = run[0]
-                self.logger.debug(f"Array: {spArray}")
-                self.process.start(spArray[0], spArray[1:])
-
                 self.discord_details = f"Playing {self.game_list.game} with {self.runner_text}"
                 self.discord_state = version_text
                 self.game_running = True
