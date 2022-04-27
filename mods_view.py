@@ -1,3 +1,4 @@
+from importlib.metadata import files
 import json
 import os
 import platform
@@ -6,6 +7,7 @@ import sys
 from PySide6 import QtCore, QtWidgets, QtGui
 from pathlib import Path
 
+
 class ModsView(QtWidgets.QMainWindow):
     def __init__(self, parent):
         super().__init__(parent=parent)
@@ -13,9 +15,11 @@ class ModsView(QtWidgets.QMainWindow):
         self.logger = logging.getLogger("Modpack Editor")
         match platform.system():
             case "Windows":
-                self.settings = QtCore.QSettings("fullerSpectrum", "Boomer Shooter Launcher")
+                self.settings = QtCore.QSettings(
+                    "fullerSpectrum", "Boomer Shooter Launcher")
             case "Linux":
-                self.settings = QtCore.QSettings("BoomerShooterLauncher", "Boomer Shooter Launcher")
+                self.settings = QtCore.QSettings(
+                    "BoomerShooterLauncher", "Boomer Shooter Launcher")
 
         self.mods = {
             "name": "Mod name",
@@ -25,9 +29,8 @@ class ModsView(QtWidgets.QMainWindow):
 
         self.setWindowTitle("Modpack Builder")
 
-        self.game_list = parent.game_list
+        self.game_list = self.parent()
         self.games = self.game_list.games
-        self.bases = []
 
         main_layout = QtWidgets.QVBoxLayout()
         header_line = QtWidgets.QHBoxLayout()
@@ -100,7 +103,8 @@ class ModsView(QtWidgets.QMainWindow):
         self.setAcceptDrops(True)
 
         self.base_combobox.currentTextChanged.connect(self.baseChanged)
-        self.center_left_list.currentRowChanged.connect(self.selectedModChanged)
+        self.center_left_list.currentRowChanged.connect(
+            self.selectedModChanged)
 
         add_file_button.clicked.connect(self.addMod)
         remove_file_button.clicked.connect(self.removeMod)
@@ -145,11 +149,16 @@ class ModsView(QtWidgets.QMainWindow):
             self.center_left_list.addItem(fileName)
 
     def baseComboBuilder(self):
-        for game in self.games:
-            if game[7] not in self.bases:
-                self.base_combobox.addItem(game[7])
-                self.bases.append(game[7])
-        self.mods["base"] = self.bases[0]
+        self.base_combobox.clear()
+        self.settings.beginGroup("Games")
+        bases = []
+        for game in self.settings.childGroups():
+            if self.settings.value(f"{game}/game") not in bases:
+                bases.append(self.settings.value(f"{game}/game"))
+                self.base_combobox.addItem(self.settings.value(f"{game}/game"))
+        self.settings.endGroup()
+        bases.sort()
+        self.mods["base"] = bases[0]
 
     def baseChanged(self, text):
         self.mods["base"] = text
@@ -172,8 +181,10 @@ class ModsView(QtWidgets.QMainWindow):
 
     def changeModPosition(self, i):
         row = self.center_left_list.currentRow()
-        if row + i > self.center_left_list.count() - 1: print("no")
-        elif row + i < 0: print("on")
+        if row + i > self.center_left_list.count() - 1:
+            print("no")
+        elif row + i < 0:
+            print("on")
         else:
             tempRow = self.center_left_list.takeItem(row+i)
             tempObj = self.mods["files"][row+i]
@@ -194,29 +205,15 @@ class ModsView(QtWidgets.QMainWindow):
             self.settings.beginGroup(f"Modpacks/{name}")
             self.settings.setValue("base", self.mods["base"])
             self.settings.beginWriteArray("files")
-            for i in range(0,len(self.mods["files"])):
+            for i in range(0, len(self.mods["files"])):
                 self.settings.setArrayIndex(i)
                 self.settings.setValue("name", self.mods["files"][i]["name"])
                 self.settings.setValue("path", self.mods["files"][i]["path"])
-                self.settings.setValue("source", self.mods["files"][i]["source"])
+                self.settings.setValue(
+                    "source", self.mods["files"][i]["source"])
             self.settings.endArray()
             self.settings.endGroup()
-            match platform.system():
-                case "Windows":
-                    appData = os.getenv('APPDATA')
-                    path = Path(appData, "fullerSpectrum", "Boomer Shooter Launcher", "Modpacks")
-                case "Linux":
-                    path = Path(Path.home(), ".config", "BoomerShooterLauncher", "Modpacks")
-            path.mkdir(exist_ok=True)
-            json_string = json.dumps(self.mods, indent=4)
-            try:
-                with open(os.path.join(path, f"{name}.json"), "w+") as outfile:
-                    outfile.write(json_string)
-                    self.logger.info(f"[Mod editor] Saved {name}.json")
-            finally:
-                outfile.close()
-                self.game_list.refresh()
-                self.close()
+            self.game_list.refresh()
 
     def changeName(self, text):
         self.mods["name"] = text
@@ -237,36 +234,28 @@ class ModsView(QtWidgets.QMainWindow):
 
     def openFile(self):
         name = self.game_list.selectedItems()[1].text()
-        match platform.system():
-            case "Windows":
-                appData = os.getenv('APPDATA')
-                path = Path(appData, "fullerSpectrum", "Boomer Shooter Launcher", "Modpacks", f"{name}.json")
-            case "Linux":
-                path = Path(Path.home(), ".config", "BoomerShooterLauncher", "Modpacks", f"{name}.json")
-        file = open(path)
-        json_data = json.load(file)
-        self.name_edit.setText(json_data["name"])
-        self.base_combobox.setCurrentText(json_data["base"])
-        for file in json_data["files"]:
-            fileSplit = os.path.abspath(file["path"]).split(os.sep)
+        self.settings.beginGroup(f"Modpacks/{name}")
+        self.name_edit.setText(name)
+        self.base_combobox.setCurrentText(self.settings.value("base"))
+        size = self.settings.beginReadArray("files")
+        self.mods["name"] = name
+        self.mods["base"] = self.settings.value("base")
+        for i in range(0, size):
+            self.settings.setArrayIndex(i)
+            fileSplit = self.settings.value("path").split(os.sep)
             fileName = fileSplit[len(fileSplit) - 1]
             self.center_left_list.addItem(fileName)
-        self.mod_name_edit.setText(json_data["files"][0]["name"])
-        self.mod_path_label.setText(json_data["files"][0]["path"])
-        self.mod_source_edit.setText(json_data["files"][0]["source"])
-        self.mods = json_data
+            self.mods["files"].append({"name": self.settings.value(
+                "name"), "path": self.settings.value("path"), "source": self.settings.value("source")})
+        self.settings.endArray()
+        self.mod_name_edit.setText(self.settings.value("files/1/name"))
+        self.mod_path_label.setText(self.settings.value("files/1/path"))
+        self.mod_source_edit.setText(self.settings.value("files/1/source"))
+        self.settings.endGroup()
         self.showWindow()
 
     def rmFile(self):
         name = self.game_list.selectedItems()[1].text()
         self.settings.remove(f"Modpacks/{name}")
         self.logger.info(f"Removing {name}")
-        match platform.system():
-            case "Windows":
-                appData = os.getenv('APPDATA')
-                path = Path(appData, "fullerSpectrum", "Boomer Shooter Launcher", "Modpacks", f"{name}.json")
-            case "Linux":
-                path = Path(Path.home(), ".config", "BoomerShooterLauncher", "Modpacks", f"{name}.json")
-        os.remove(path)
-        self.logger.debug(f"Removed {path}")
         self.game_list.refresh()

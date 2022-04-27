@@ -21,7 +21,6 @@ class GamesView(QtWidgets.QTableWidget):
         self.logger.debug("Building game list")
         self.runnerList = runnerList
         self.games = []
-        self.modpacks = []
         self.files = []
         self.row_data = []
         self.game = ""
@@ -31,7 +30,7 @@ class GamesView(QtWidgets.QTableWidget):
         self.setAlternatingRowColors(True)
         self.setWordWrap(False)
         self.verticalHeader().setVisible(False)
-        self.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
+        self.setSelectionMode(QtWidgets.QAbstractItemView.SingleSelection)
         self.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
         self.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
 
@@ -58,6 +57,8 @@ class GamesView(QtWidgets.QTableWidget):
         self.setRowCount(len(self.settings.childGroups()))
         for i, base in enumerate(self.settings.childGroups(),start=0):
             self.settings.beginGroup(base)
+            list = (self.settings.value("game"), base, self.settings.value("version"))
+            self.row_data.append(list)
             filesArray = []
             for j, game in enumerate(self.settings.childGroups(), start=0):
                 self.setItem(i,0,QtWidgets.QTableWidgetItem(self.settings.value("game")))
@@ -72,51 +73,29 @@ class GamesView(QtWidgets.QTableWidget):
             self.settings.endGroup()
         self.settings.endGroup()
         self.loadModpacks()
-        # try:
-        #     self.bases = dbConnect.execute('SELECT * FROM Games GROUP BY base ORDER BY game').fetchall()
-        #     allGames = dbConnect.execute('SELECT * FROM Games ORDER BY game').fetchall()
-        #     for game in allGames:
-        #         if os.path.exists(game[5]):
-        #             self.games.append(game)
-        #             self.row_data.append(game)
-        #         else:
-        #             self.logger.debug(f"Removing {game}")
-        #             dbConnect.execute('DELETE FROM Games WHERE crc=?', (game[4],))
-        #             dbConnect.commit()
-        #             self.refresh()
-        #             break
-        #     self.loadModpacks()
-        #     self.sortItems(0, order=QtCore.Qt.AscendingOrder)
-        # except Exception as e:
-        #     self.logger.exception(e)
-        # finally:
-        #     dbConnect.close()
 
     def loadModpacks(self):
         self.logger.info("Refreshing modpacks")
-        match platform.system():
-            case "Windows":
-                appData = os.getenv('APPDATA')
-                path = Path(appData, "fullerSpectrum", "Boomer Shooter Launcher", "Modpacks")
-            case "Linux":
-                path = Path(Path.home(), ".config", "BoomerShooterLauncher", "Modpacks")
-        os.makedirs(path, exist_ok=True)
-        modpacks = [os.path.join(path, f) for f in os.listdir(path)]
-        for pack in modpacks:
-            with open(pack) as json_file:
-                data = json.load(json_file)
-                self.modpacks.append(data)
-                list = (data["base"] + " (Modded)", data["name"], "modpack", 0, "modpack", [])
-                for file in data["files"]:
-                    list[5].append(os.path.realpath(file["path"]))
-                items = self.findItems(data["base"], QtCore.Qt.MatchExactly)
-                if items:
-                    pos = items[len(items) - 1].row() + 1
-                    self.insertRow(pos)
-                    self.row_data.insert(pos, list)
-                    self.setItem(pos, 0, QtWidgets.QTableWidgetItem(list[0]))
-                    self.setItem(pos, 1, QtWidgets.QTableWidgetItem(list[1]))
-                    self.setItem(pos, 2, QtWidgets.QTableWidgetItem(", ".join(list[5])))
+        self.settings.beginGroup("Modpacks")
+        for pack in self.settings.childGroups():
+            self.settings.beginGroup(pack)
+            files = []
+            size = self.settings.beginReadArray("files")
+            for i in range(0, size):
+                self.settings.setArrayIndex(i)
+                files.append(str(Path(self.settings.value("path")).resolve()))
+            self.settings.endArray()
+            list = (self.settings.value("base") + " (Modded)", pack, "modpack", 0, "modpack", files)
+            items = self.findItems(self.settings.value("base"), QtCore.Qt.MatchExactly)
+            if items:
+                pos = items[len(items) - 1].row() + 1
+                self.insertRow(pos)
+                self.row_data.insert(pos, list)
+                self.setItem(pos, 0, QtWidgets.QTableWidgetItem(list[0]))
+                self.setItem(pos, 1, QtWidgets.QTableWidgetItem(list[1]))
+                self.setItem(pos, 2, QtWidgets.QTableWidgetItem(", ".join(list[5])))
+            self.settings.endGroup()
+        self.settings.endGroup()
 
     def updateRow(self):
         if self.selectedItems():
@@ -135,6 +114,7 @@ class GamesView(QtWidgets.QTableWidget):
                     self.modpack_selected = False
                     self.files.clear()
                     break
+            self.settings.endGroup()
 
     def generateMenu(self, pos):
         self.menu.exec_(self.mapToGlobal(pos))
@@ -142,8 +122,10 @@ class GamesView(QtWidgets.QTableWidget):
     def eventFilter(self, object: QtCore.QObject, event: QtCore.QEvent) -> bool:
         if(event.type() == QtCore.QEvent.MouseButtonPress and event.buttons() == QtCore.Qt.RightButton and object is self.viewport()):
             item = self.itemAt(event.pos()).row()
+            print(self.row_data)
             row = self.row_data[item]
             self.menu = QtWidgets.QMenu(self)
+            print(row)
             if row[2] == "modpack":
                 self.mods_view = ModsView(self)
                 edit = self.menu.addAction("Edit modpack", self.mods_view.openFile)

@@ -206,7 +206,7 @@ class MainWindow(QtWidgets.QMainWindow):
             self.settings.endGroup()
         
     def showModWindow(self):
-        self.mod_list = ModsView(self)  
+        self.mod_list = ModsView(self.game_list)  
         self.mod_list.showWindow()
     
     def dragEnterEvent(self, event):
