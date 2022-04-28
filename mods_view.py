@@ -1,11 +1,7 @@
-from importlib.metadata import files
-import json
 import os
 import platform
 import logging
-import sys
 from PySide6 import QtCore, QtWidgets, QtGui
-from pathlib import Path
 
 
 class ModsView(QtWidgets.QMainWindow):
@@ -38,8 +34,8 @@ class ModsView(QtWidgets.QMainWindow):
         self.center_left_list = QtWidgets.QListWidget()
         center_right_grid = QtWidgets.QGridLayout()
         centerVBox = QtWidgets.QVBoxLayout()
-        up_button = QtWidgets.QPushButton("▲", self)
-        down_button = QtWidgets.QPushButton("▼", self)
+        self.up_button = QtWidgets.QPushButton("▲", self)
+        self.down_button = QtWidgets.QPushButton("▼", self)
         footer_buttons = QtWidgets.QHBoxLayout()
 
         main_layout.addLayout(header_line)
@@ -53,8 +49,8 @@ class ModsView(QtWidgets.QMainWindow):
         centerHBox.setAlignment(QtCore.Qt.AlignCenter)
 
         centerVBox.setAlignment(QtCore.Qt.AlignVCenter)
-        centerVBox.addWidget(up_button)
-        centerVBox.addWidget(down_button)
+        centerVBox.addWidget(self.up_button)
+        centerVBox.addWidget(self.down_button)
 
         self.base_combobox = QtWidgets.QComboBox()
         self.name_edit = QtWidgets.QLineEdit()
@@ -109,8 +105,8 @@ class ModsView(QtWidgets.QMainWindow):
         add_file_button.clicked.connect(self.addMod)
         remove_file_button.clicked.connect(self.removeMod)
 
-        up_button.clicked.connect(self.moveUp)
-        down_button.clicked.connect(self.moveDown)
+        self.up_button.clicked.connect(self.moveUp)
+        self.down_button.clicked.connect(self.moveDown)
         save_button.clicked.connect(self.saveFile)
         self.name_edit.textEdited.connect(self.changeName)
         self.mod_name_edit.textEdited.connect(self.changeModName)
@@ -168,6 +164,11 @@ class ModsView(QtWidgets.QMainWindow):
         self.mod_source_edit.setText(self.mods["files"][currentRow]["source"])
         self.mod_path_label.setText(self.mods["files"][currentRow]["path"])
         self.selected = currentRow
+        row = self.center_left_list.currentRow()
+        if row == 0: self.up_button.setDisabled(True)
+        else: self.up_button.setDisabled(False)
+        if row == self.center_left_list.count() - 1: self.down_button.setDisabled(True)
+        else: self.down_button.setDisabled(False)
 
     def removeMod(self):
         row = self.center_left_list.currentRow()
@@ -181,17 +182,12 @@ class ModsView(QtWidgets.QMainWindow):
 
     def changeModPosition(self, i):
         row = self.center_left_list.currentRow()
-        if row + i > self.center_left_list.count() - 1:
-            print("no")
-        elif row + i < 0:
-            print("on")
-        else:
-            tempRow = self.center_left_list.takeItem(row+i)
-            tempObj = self.mods["files"][row+i]
-            self.center_left_list.insertItem(row, tempRow)
-            self.mods["files"][row+i] = self.mods["files"][row]
-            self.mods["files"][row] = tempObj
-            self.selected = self.center_left_list.currentRow()
+        tempRow = self.center_left_list.takeItem(row+i)
+        tempObj = self.mods["files"][row+i]
+        self.center_left_list.insertItem(row, tempRow)
+        self.mods["files"][row+i] = self.mods["files"][row]
+        self.mods["files"][row] = tempObj
+        self.selected = self.center_left_list.currentRow()
 
     def moveUp(self):
         self.changeModPosition(-1)

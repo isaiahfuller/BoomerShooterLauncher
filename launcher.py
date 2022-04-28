@@ -25,7 +25,6 @@ class GameLauncher(QtCore.QProcess):
         game_dir = str(game_path).split(os.sep)
         game_dir.pop(len(game_dir) - 1)
         game_dir = Path("/".join(game_dir))
-        print(game_dir)
         spArray = [""]*3
         if game in ["Duke Nukem 3D", "Ion Fury"]:
             spArray = [str(runner_path), "-usecwd", "-nosetup",

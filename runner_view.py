@@ -2,7 +2,6 @@ from PySide6 import QtCore, QtWidgets, QtGui
 from pathlib import Path
 import logging
 import os
-import sys
 import data
 import webbrowser
 import platform
@@ -66,19 +65,6 @@ class RunnerView(QtWidgets.QMainWindow):
     def builder(self, game):
         self.runnerList.clear()
         self.game = game
-        # if game == "all":
-        #     try:
-        #         c = db.connect()
-        #         query = "SELECT * FROM Runners"
-        #         allRunners = c.execute(query).fetchall()
-        #     finally:
-        #         c.close()
-        #     for i in allRunners:
-        #         self.runnerList.addItem(f"{i[0]} [installed]")
-        #     for i in data.runners:
-        #         if not self.runnerList.findItems(i, QtCore.Qt.MatchContains):
-        #             self.runnerList.addItem(i)
-        #     # self.runnerList.addItems(list(data.runners.keys()))
         if game == "all":
             self.settings.beginGroup("Runners")
             allRunners = self.settings.childGroups()

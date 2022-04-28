@@ -3,7 +3,6 @@ import data
 import platform
 from discord import Discord
 from PySide6 import QtCore, QtWidgets, QtGui
-from pathlib import Path
 from games_view import *
 from scanner import *
 from runner_view import *
@@ -55,7 +54,8 @@ class MainWindow(QtWidgets.QMainWindow):
         file_toolbar.addAction("&Add Runners", self.runner_list.showWindowFromMenu)
         file_toolbar.addAction("&Add Games", self.gameScanner)
         file_toolbar.addAction("&Add Modpack", self.showModWindow)
-        file_toolbar.addAction("&R", self.game_list.refresh)
+        if self.logger.level == logging.DEBUG:
+            file_toolbar.addAction("&Refresh", self.game_list.refresh)
         
         self.runner_combobox = QtWidgets.QComboBox()
         self.runner_combobox.addItem("Select a game first")
@@ -113,8 +113,6 @@ class MainWindow(QtWidgets.QMainWindow):
         self.current_runners.clear()
         self.runner_combobox.clear()
         if(self.game_list.selectedIndexes()):
-            # i = self.game_list.selected_row
-            # game = self.game_list.bases[i][7]
             game = self.game_list.selectedItems()[0].text().replace(" (Modded)","")
             
             self.game = game
@@ -153,11 +151,6 @@ class MainWindow(QtWidgets.QMainWindow):
                         self.settings.beginGroup(i)
                         res = res + self.settings.childGroups()
                         self.settings.endGroup()
-                    # self.settings.beginGroup(i)
-                    # for j in self.settings.childGroups():
-                    #     if self.settings.value(f"{j}/game") == game:
-                    #         res.append(j)
-                    # self.settings.endGroup()
             else:
                 game = self.game_list.selectedItems()[1].text()
                 self.settings.beginGroup(game)
@@ -183,8 +176,6 @@ class MainWindow(QtWidgets.QMainWindow):
         else:
             game = self.game
         self.settings.beginGroup(f"Games/{game}/{version_text}")
-        print(self.settings.childKeys())
-        print(game)
         try:
             game = self.settings.value("path")
             if len(self.current_runners) == 0:

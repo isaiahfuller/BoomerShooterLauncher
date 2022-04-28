@@ -1,6 +1,4 @@
-import sys
 import zlib
-# import db
 import os
 import data
 import platform
@@ -83,8 +81,3 @@ class GameScanner(QtWidgets.QFileDialog):
             except Exception as e:
                 self.logger.exception(e)
                 self.logger.warning(f"Failed to scan file {fileName}")
-
-    def wadHex(self, loc):
-        file = open(loc, "rb")
-        byte = file.read(4)
-        print(byte)

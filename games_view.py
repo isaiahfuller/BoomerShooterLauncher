@@ -1,6 +1,4 @@
-import sys
 import os
-import json
 import platform
 import logging
 
@@ -122,12 +120,12 @@ class GamesView(QtWidgets.QTableWidget):
     def eventFilter(self, object: QtCore.QObject, event: QtCore.QEvent) -> bool:
         if(event.type() == QtCore.QEvent.MouseButtonPress and event.buttons() == QtCore.Qt.RightButton and object is self.viewport()):
             item = self.itemAt(event.pos()).row()
-            print(self.row_data)
             row = self.row_data[item]
             self.menu = QtWidgets.QMenu(self)
-            print(row)
+            self.mods_view = ModsView(self)
             if row[2] == "modpack":
-                self.mods_view = ModsView(self)
                 edit = self.menu.addAction("Edit modpack", self.mods_view.openFile)
                 delete = self.menu.addAction("Remove modpack", self.mods_view.rmFile)
+            else:
+                add = self.menu.addAction("Add modpack", self.mods_view.showWindow)
         return super().eventFilter(object, event)
