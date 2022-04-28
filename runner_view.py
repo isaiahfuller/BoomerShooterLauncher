@@ -10,6 +10,7 @@ import subprocess
 class RunnerView(QtWidgets.QMainWindow):
     def __init__(self, parent):
         super().__init__(parent=parent)
+        self.setWindowModality(QtCore.Qt.ApplicationModal)
         self.logger = logging.getLogger("Modpack Editor")
 
         match platform.system():
@@ -58,8 +59,12 @@ class RunnerView(QtWidgets.QMainWindow):
         self.showWindow("all")
 
     def showWindow(self, game):
-        self.resize(400, 300)
+        self.resize(400, 400)
         self.builder(game)
+        mainLocation = self.parent().frameGeometry()
+        x = mainLocation.x() + mainLocation.width() / 2 - self.width() / 2
+        y = mainLocation.y() + mainLocation.height() / 2 - self.height() / 2
+        self.move(x, y)
         self.show()
 
     def builder(self, game):
@@ -89,7 +94,7 @@ class RunnerView(QtWidgets.QMainWindow):
         for i in data.runners:
             if i == self.name:
                 self.executable = data.runners[i]["executable"]
-                self.descriptionLabel.setText("Description:\n" + data.runners[i]["description"])
+                self.descriptionLabel.setText(data.runners[i]["description"])
                 self.url = data.runners[i]["link"]
                 self.downloadButton.setEnabled(True)
                 if installed: self.selectInstalledButton.setEnabled(False)

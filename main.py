@@ -28,7 +28,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.discord = Discord()
         
         self.runner_list = RunnerView(self)
-        self.game_list = GamesView(self.runner_list)
+        self.game_list = GamesView(self)
         self.process = GameLauncher(self)
         self.discord_timer = QtCore.QTimer()
         self.discord_details = ""

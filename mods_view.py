@@ -7,6 +7,7 @@ from PySide6 import QtCore, QtWidgets, QtGui
 class ModsView(QtWidgets.QMainWindow):
     def __init__(self, parent):
         super().__init__(parent=parent)
+        self.setWindowModality(QtCore.Qt.ApplicationModal)
 
         self.logger = logging.getLogger("Modpack Editor")
         match platform.system():
@@ -222,6 +223,10 @@ class ModsView(QtWidgets.QMainWindow):
 
     def showWindow(self):
         self.setFixedSize(500, 500)
+        mainLocation = self.parent().parent().parent().parent().frameGeometry()
+        x = mainLocation.x() + mainLocation.width() / 2 - self.width() / 2
+        y = mainLocation.y() + mainLocation.height() / 2 - self.height() / 2
+        self.move(x, y)
         self.show()
 
     def closeEvent(self, event: QtGui.QCloseEvent) -> None:

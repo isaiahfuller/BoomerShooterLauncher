@@ -7,17 +7,16 @@ from pathlib import Path
 from mods_view import *
 
 class GamesView(QtWidgets.QTableWidget):
-    def __init__(self, runnerList):
+    def __init__(self, parent):
+        super().__init__(parent=parent)
         self.logger = logging.getLogger("Game List")
+        self.logger.debug("Building game list")
         match platform.system():
             case "Windows":
                 self.settings = QtCore.QSettings("fullerSpectrum", "Boomer Shooter Launcher")
             case "Linux":
                 self.settings = QtCore.QSettings("BoomerShooterLauncher", "Boomer Shooter Launcher")
 
-        super().__init__()
-        self.logger.debug("Building game list")
-        self.runnerList = runnerList
         self.games = []
         self.files = []
         self.row_data = []
