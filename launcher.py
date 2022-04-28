@@ -37,10 +37,6 @@ class GameLauncher(QtCore.QProcess):
             for i in other_files:
                 spArray.append("-file")
                 spArray.append(i)
-            if runner == "Chocolate Doom":
-                mouse = open('./MOUSE.CFG')
-                spArray.append("-config")
-                spArray.append(str(Path(mouse.name).resolve()))
         match platform.system():
             case "Windows": run_path = spArray[1]
             case "Linux": run_path = Path(Path.home(), ".local", "share", "Boomer Shooter Launcher", runner, self.parent().game_list.game)
