@@ -210,7 +210,7 @@ class ModsView(QtWidgets.QMainWindow):
                     "source", self.mods["files"][i]["source"])
             self.settings.endArray()
             self.settings.endGroup()
-            self.game_list.refresh()
+            self.close()
 
     def changeName(self, text):
         self.mods["name"] = text
@@ -238,9 +238,9 @@ class ModsView(QtWidgets.QMainWindow):
         self.settings.beginGroup(f"Modpacks/{name}")
         self.name_edit.setText(name)
         self.base_combobox.setCurrentText(self.settings.value("base"))
-        size = self.settings.beginReadArray("files")
         self.mods["name"] = name
         self.mods["base"] = self.settings.value("base")
+        size = self.settings.beginReadArray("files")
         for i in range(0, size):
             self.settings.setArrayIndex(i)
             fileSplit = self.settings.value("path").split(os.sep)
