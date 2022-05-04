@@ -38,7 +38,7 @@ class GameLauncher(QtCore.QProcess):
                 spArray.append("-file")
                 spArray.append(i)
         match platform.system():
-            case "Windows": run_path = Path(Path.home(), "AppData", "Roaming", "Boomer Shooter Launcher", runner, self.parent().game_list.game)
+            case "Windows": run_path = Path(Path.home(), "AppData", "Roaming", "Boomer Shooter Launcher", "Saves", runner, self.parent().game_list.game)
             case "Linux": run_path = Path(Path.home(), ".local", "share", "Boomer Shooter Launcher", runner, self.parent().game_list.game)
         spArray.append("-savedir")
         spArray.append(str(run_path))

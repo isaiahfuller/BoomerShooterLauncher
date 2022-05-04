@@ -123,6 +123,8 @@ class MainWindow(QtWidgets.QMainWindow):
                 for y in data.runners:
                     if game in data.runners[y]["games"] and x in y:
                         self.current_runners.append(x)
+                if x not in data.runners:
+                    self.current_runners.append(x)
             self.logger.debug(f"Compatible runners for \"{game}\": {self.current_runners}")
             if(len(self.current_runners)) == 0:
                 self.runner_combobox.adjustSize()

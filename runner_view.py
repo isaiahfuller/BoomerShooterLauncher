@@ -36,16 +36,20 @@ class RunnerView(QtWidgets.QMainWindow):
 
         self.buttonBox = QtWidgets.QHBoxLayout()
         self.downloadButton = QtWidgets.QPushButton("Download", self)
-
         self.selectInstalledButton = QtWidgets.QPushButton("Select", self)
+        self.removeButton = QtWidgets.QPushButton("Remove", self)
         
         self.downloadButton.setEnabled(False)
         self.selectInstalledButton.setEnabled(False)
+        self.removeButton.setEnabled(False)
+
         self.downloadButton.clicked.connect(self.getDownloadLink)
         self.selectInstalledButton.clicked.connect(self.addToDb)
+        self.removeButton.clicked.connect(self.removeRunner)
 
         self.buttonBox.addWidget(self.downloadButton)
         self.buttonBox.addWidget(self.selectInstalledButton)
+        self.buttonBox.addWidget(self.removeButton)
 
         self.boxLayout.addLayout(self.buttonBox)
 
@@ -84,6 +88,13 @@ class RunnerView(QtWidgets.QMainWindow):
                 if game in data.runners[i]["games"]:
                     if not self.runnerList.findItems(i, QtCore.Qt.MatchExactly):
                         self.runnerList.addItem(i)
+        # self.settings.beginGroup("Runners")
+        # allRunners = self.settings.childGroups()
+        # self.settings.endGroup()
+        # for x in allRunners:
+        #     if x not in data.runners:
+        #         self.runnerList.addItem(x)
+        self.runnerList.addItem("Custom...")
     
     def setRunner(self):
         if "[installed]" in self.name:
@@ -91,15 +102,32 @@ class RunnerView(QtWidgets.QMainWindow):
         else:
             installed = False
         self.name = self.name.replace(" [installed]", "")
-        for i in data.runners:
-            if i == self.name:
-                self.executable = data.runners[i]["executable"]
-                self.descriptionLabel.setText(data.runners[i]["description"])
-                self.url = data.runners[i]["link"]
-                self.downloadButton.setEnabled(True)
-                if installed: self.selectInstalledButton.setEnabled(False)
-                else: self.selectInstalledButton.setEnabled(True)
-                break
+        if self.name == "Custom...":
+            self.executable = "*"
+            self.descriptionLabel.setText("Add a runner that isn't listed.")
+            self.selectInstalledButton.setEnabled(True)
+            self.downloadButton.setEnabled(False)
+            self.removeButton.setEnabled(False)
+        elif self.name not in data.runners:
+            self.executable = self.name
+            self.descriptionLabel.setText("Custom runner.")
+            self.selectInstalledButton.setEnabled(False)
+            self.removeButton.setEnabled(True)
+            self.downloadButton.setEnabled(False)
+        else:
+            for i in data.runners:
+                if i == self.name:
+                    self.executable = data.runners[i]["executable"]
+                    self.descriptionLabel.setText(data.runners[i]["description"])
+                    self.url = data.runners[i]["link"]
+                    self.downloadButton.setEnabled(True)
+                    if installed: 
+                        self.selectInstalledButton.setEnabled(False)
+                        self.removeButton.setEnabled(True)
+                    else: 
+                        self.selectInstalledButton.setEnabled(True)
+                        self.removeButton.setEnabled(False)
+                    break
 
     def getDownloadLink(self):
         webbrowser.open(self.url)
@@ -119,11 +147,12 @@ class RunnerView(QtWidgets.QMainWindow):
                 file = subprocess.run(["which", exe], stdout=subprocess.PIPE)
                 filePath = Path(file.stdout.decode("utf-8"))
         try:    
-            if Path(filePath).stem.strip() == self.executable:
-                self.settings.beginGroup(f"Runners/{self.runnerList.selectedItems()[0].text()}")
-                self.settings.setValue("path", str(filePath).strip())
-                self.settings.setValue("executable", self.executable)
-                self.settings.endGroup()
+            if self.name == "Custom...":
+                self.settings.beginGroup(f"Runners/{Path(filePath).name}")
+            else: self.settings.beginGroup(f"Runners/{self.runnerList.selectedItems()[0].text()}")
+            self.settings.setValue("path", str(filePath).strip())
+            self.settings.setValue("executable", self.executable)
+            self.settings.endGroup()
         except Exception as e:
             logging.exception(e)
             logging.warning(f"[Runner List] Failed to add {self.runnerList.selectedItems()[0].text()} to db")
@@ -132,6 +161,10 @@ class RunnerView(QtWidgets.QMainWindow):
                 self.builder(self.game)
                 self.selectInstalledButton.setEnabled(False)
                 if not self.openedFromMenu: self.close()
+
+    def removeRunner(self):
+        self.settings.remove(f"Runners/{self.name}")
+        self.builder(self.game)
 
     def closeEvent(self, event: QtGui.QCloseEvent) -> None:
         self.runnerList.clear()
