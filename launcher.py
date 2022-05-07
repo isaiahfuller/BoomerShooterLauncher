@@ -55,5 +55,5 @@ class GameLauncher(QtCore.QProcess):
         self.logger.info("Game closed")
         if exitCode != 0:
             errorWindow = QtWidgets.QErrorMessage(parent=self.parent())
-            errorWindow.showMessage(f"{self.runner} crashed (Code {exitCode}). Double check your runner and game version if modded.")
+            errorWindow.showMessage(f"{self.runner} exited with non-zero code {exitCode}. Double check your runner and game version if modded.")
             self.logger.error(f"{self.runner} crashed. (Code {exitCode})")
