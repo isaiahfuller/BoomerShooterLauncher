@@ -175,9 +175,13 @@ class MainWindow(QtWidgets.QMainWindow):
         self.runner_text = self.runner_combobox.currentText()
         if "(Modded)" not in self.game_list.selectedItems()[0].text():
             game = self.game_list.selectedItems()[1].text()
+            self.settings.beginGroup(f"Games/{game}/{version_text}")
         else:
-            game = self.game
-        self.settings.beginGroup(f"Games/{game}/{version_text}")
+            keys = self.settings.allKeys()
+            for i in keys:
+                if f"/{version_text}/crc" in i:
+                    game = i.replace("/crc","")
+                    self.settings.beginGroup(game)
         try:
             game = self.settings.value("path")
             if len(self.current_runners) == 0:
