@@ -17,7 +17,7 @@ class RunnerView(QtWidgets.QMainWindow):
             case "Windows":
                 self.settings = QtCore.QSettings("fullerSpectrum", "Boomer Shooter Launcher")
             case "Linux":
-                self.settings = QtCore.QSettings("BoomerShooterLauncher", "Boomer Shooter Launcher")
+                self.settings = QtCore.QSettings("boomershooterlauncher", "config")
 
         self.boxLayout = QtWidgets.QVBoxLayout()
         self.openedFromMenu = False
@@ -144,15 +144,20 @@ class RunnerView(QtWidgets.QMainWindow):
                 filePath = files[0].toLocalFile()
             case "Linux":
                 exe = self.executable
-                file = subprocess.run(["which", exe], stdout=subprocess.PIPE)
-                filePath = Path(file.stdout.decode("utf-8"))
+                if exe == "*":
+                    files = self.runnerDialog.getOpenFileUrl()
+                    filePath = files[0].toLocalFile()
+                else:
+                    file = subprocess.run(["which", exe], stdout=subprocess.PIPE)
+                    filePath = Path(file.stdout.decode("utf-8"))
         try:    
-            if self.name == "Custom...":
-                self.settings.beginGroup(f"Runners/{Path(filePath).name}")
-            else: self.settings.beginGroup(f"Runners/{self.runnerList.selectedItems()[0].text()}")
-            self.settings.setValue("path", str(filePath).strip())
-            self.settings.setValue("executable", self.executable)
-            self.settings.endGroup()
+            if filePath != "":
+                if self.name == "Custom...":
+                    self.settings.beginGroup(f"Runners/{Path(filePath).name}")
+                else: self.settings.beginGroup(f"Runners/{self.runnerList.selectedItems()[0].text()}")
+                self.settings.setValue("path", str(filePath).strip())
+                self.settings.setValue("executable", self.executable)
+                self.settings.endGroup()
         except Exception as e:
             logging.exception(e)
             logging.warning(f"[Runner List] Failed to add {self.runnerList.selectedItems()[0].text()} to db")

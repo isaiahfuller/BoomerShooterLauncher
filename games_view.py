@@ -15,7 +15,7 @@ class GamesView(QtWidgets.QTableWidget):
             case "Windows":
                 self.settings = QtCore.QSettings("fullerSpectrum", "Boomer Shooter Launcher")
             case "Linux":
-                self.settings = QtCore.QSettings("BoomerShooterLauncher", "Boomer Shooter Launcher")
+                self.settings = QtCore.QSettings("boomershooterlauncher", "config")
 
         self.games = []
         self.files = []

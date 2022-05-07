@@ -13,19 +13,23 @@ class GameLauncher(QtCore.QProcess):
             case "Windows":
                 self.settings = QtCore.QSettings("fullerSpectrum", "Boomer Shooter Launcher")
             case "Linux":
-                self.settings = QtCore.QSettings("Boomer Shooter Launcher", "config")
+                self.settings = QtCore.QSettings("boomershooterlauncher", "config")
         self.finished.connect(self.processFinished)
 
     def runGame(self, game, game_path, runner, other_files):
         self.runner = runner
+        self.settings.beginGroup("Runners")
+        path = self.settings.value(f"{runner}/path")
         self.logger.debug(f"Game: {game} @ {game_path}")
         self.logger.debug(f"Runner: {runner}")
+        self.logger.debug(f"Path: {path}")
         self.logger.debug(f"Other files: {other_files}")
-        runner_path = Path(self.settings.value(f"Runners/{runner}/path"))
+        runner_path = Path(self.settings.value(f"{runner}/path"))
         game_dir = str(game_path).split(os.sep)
         game_dir.pop(len(game_dir) - 1)
         game_dir = Path("/".join(game_dir))
         spArray = [""]*3
+        self.settings.endGroup()
         if game in ["Duke Nukem 3D", "Ion Fury"]:
             spArray = [str(runner_path), "-usecwd", "-nosetup",
                     "-gamegrp", game_path, "-game_dir", str(game_dir)]

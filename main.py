@@ -22,7 +22,7 @@ class MainWindow(QtWidgets.QMainWindow):
             case "Windows":
                 self.settings = QtCore.QSettings("fullerSpectrum", "Boomer Shooter Launcher")
             case "Linux":
-                self.settings = QtCore.QSettings("BoomerShooterLauncher", "Boomer Shooter Launcher")
+                self.settings = QtCore.QSettings("boomershooterlauncher", "config")
 
         self.readSettings()
         self.discord = Discord()
