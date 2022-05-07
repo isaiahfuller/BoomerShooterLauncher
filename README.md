@@ -2,6 +2,15 @@
 
 A launcher for old-school FPS games
 
+<details>
+<summary>Screenshots</summary>
+<img src=https://user-images.githubusercontent.com/9921699/167270117-3bed41b8-a4f3-4410-9bb5-cb056f90e5d2.png></img>
+<img src=https://user-images.githubusercontent.com/9921699/167270128-d027aa9b-3610-494e-9504-838908404450.png></img>
+<img src=https://user-images.githubusercontent.com/9921699/167270134-48622eec-004d-4a87-9688-40073cf0ae95.png></img>
+</details>
+------------
+
+
 **Installation** - Requires Python 3.10 or higher
 
     pip install -r requirements.txt
