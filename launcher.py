@@ -16,38 +16,38 @@ class GameLauncher(QtCore.QProcess):
                 self.settings = QtCore.QSettings("boomershooterlauncher", "config")
         self.finished.connect(self.processFinished)
 
-    def runGame(self, game, game_path, runner, other_files):
+    def runGame(self, game, gamePath, runner, otherFiles):
         self.runner = runner
         self.settings.beginGroup("Runners")
         path = self.settings.value(f"{runner}/path")
-        self.logger.debug(f"Game: {game} @ {game_path}")
+        self.logger.debug(f"Game: {game} @ {gamePath}")
         self.logger.debug(f"Runner: {runner}")
         self.logger.debug(f"Path: {path}")
-        self.logger.debug(f"Other files: {other_files}")
-        runner_path = Path(self.settings.value(f"{runner}/path"))
-        game_dir = str(game_path).split(os.sep)
-        game_dir.pop(len(game_dir) - 1)
-        game_dir = Path("/".join(game_dir))
+        self.logger.debug(f"Other files: {otherFiles}")
+        runnerPath = Path(self.settings.value(f"{runner}/path"))
+        gameDir = str(gamePath).split(os.sep)
+        gameDir.pop(len(gameDir) - 1)
+        gameDir = Path("/".join(gameDir))
         spArray = [""]*3
         self.settings.endGroup()
         if game in ["Duke Nukem 3D", "Ion Fury"]:
-            spArray = [str(runner_path), "-usecwd", "-nosetup",
-                    "-gamegrp", game_path, "-game_dir", str(game_dir)]
-            for i in other_files:
+            spArray = [str(runnerPath), "-usecwd", "-nosetup",
+                    "-gamegrp", gamePath, "-game_dir", str(gameDir)]
+            for i in otherFiles:
                 spArray.append("-file")
                 spArray.append(i)
         else:
-            spArray = [str(runner_path), "-iwad", game_path]
-            for i in other_files:
+            spArray = [str(runnerPath), "-iwad", gamePath]
+            for i in otherFiles:
                 spArray.append("-file")
                 spArray.append(i)
         match platform.system():
-            case "Windows": run_path = Path(Path.home(), "AppData", "Roaming", "Boomer Shooter Launcher", "Saves", runner, self.parent().game_list.game)
-            case "Linux": run_path = Path(Path.home(), ".local", "share", "Boomer Shooter Launcher", runner, self.parent().game_list.game)
+            case "Windows": runPath = Path(Path.home(), "AppData", "Roaming", "Boomer Shooter Launcher", "Saves", runner, self.parent().gameList.game)
+            case "Linux": runPath = Path(Path.home(), ".local", "share", "Boomer Shooter Launcher", runner, self.parent().gameList.game)
         spArray.append("-savedir")
-        spArray.append(str(run_path))
-        os.makedirs(run_path, exist_ok=True)
-        os.chdir(run_path)
+        spArray.append(str(runPath))
+        os.makedirs(runPath, exist_ok=True)
+        os.chdir(runPath)
         self.logger.debug(f"Array: {spArray}")
         self.start(spArray[0], spArray[1:])
     

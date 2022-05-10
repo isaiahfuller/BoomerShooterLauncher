@@ -88,12 +88,6 @@ class RunnerView(QtWidgets.QMainWindow):
                 if game in data.runners[i]["games"]:
                     if not self.runnerList.findItems(i, QtCore.Qt.MatchExactly):
                         self.runnerList.addItem(i)
-        # self.settings.beginGroup("Runners")
-        # allRunners = self.settings.childGroups()
-        # self.settings.endGroup()
-        # for x in allRunners:
-        #     if x not in data.runners:
-        #         self.runnerList.addItem(x)
         self.runnerList.addItem("Custom...")
     
     def setRunner(self):

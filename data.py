@@ -194,6 +194,15 @@ games = {
             {"crc": "298dd5b5", "version": "release", "name": "Chex Quest"}
         ]
     },
+    "chex3.wad": {
+        "name": "Chex Quest 3",
+        "year": 2008,
+        "runner": "doom",
+        "game": "Chex Quest 3",
+        "releases": [
+            {"crc": "34aa2168", "version": "1.4"}, {"crc": "a6a5bf06", "version":"1.0"}
+        ]
+    },
     "freedoom1.wad": {
         "name": "Freedoom: Phase 1",
         "year": 2001,
@@ -412,7 +421,7 @@ games = {
         "releases": []
     }
 }
-game_blacklist = ["2587d97b","8fe33445","c8a8b5ea","f97fe671"]
+gameBlacklist = ["2587d97b","8fe33445","c8a8b5ea","f97fe671"]
 runners = {
     "GZDoom": {
         "link": "https://github.com/coelckers/gzdoom/releases/latest",

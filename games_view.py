@@ -19,10 +19,10 @@ class GamesView(QtWidgets.QTableWidget):
 
         self.games = []
         self.files = []
-        self.row_data = []
+        self.rowData = []
         self.game = ""
-        self.selected_row = 0
-        self.modpack_selected = False
+        self.selectedRow = 0
+        self.modpackSelected = False
         
         self.setAlternatingRowColors(True)
         self.setWordWrap(False)
@@ -48,14 +48,14 @@ class GamesView(QtWidgets.QTableWidget):
     def refresh(self):
         self.logger.info("Refreshing table")
         self.games.clear()
-        self.row_data.clear()
+        self.rowData.clear()
         self.clearContents()
         self.settings.beginGroup("Games")
         self.setRowCount(len(self.settings.childGroups()))
         for i, base in enumerate(self.settings.childGroups(),start=0):
             self.settings.beginGroup(base)
             list = (self.settings.value("game"), base, self.settings.value("version"))
-            self.row_data.append(list)
+            self.rowData.append(list)
             filesArray = []
             for j, game in enumerate(self.settings.childGroups(), start=0):
                 self.setItem(i,0,QtWidgets.QTableWidgetItem(self.settings.value("game")))
@@ -87,7 +87,7 @@ class GamesView(QtWidgets.QTableWidget):
             if items:
                 pos = items[len(items) - 1].row() + 1
                 self.insertRow(pos)
-                self.row_data.insert(pos, list)
+                self.rowData.insert(pos, list)
                 self.setItem(pos, 0, QtWidgets.QTableWidgetItem(list[0]))
                 self.setItem(pos, 1, QtWidgets.QTableWidgetItem(list[1]))
                 self.setItem(pos, 2, QtWidgets.QTableWidgetItem(", ".join(list[5])))
@@ -102,13 +102,13 @@ class GamesView(QtWidgets.QTableWidget):
             for i in range(len(bases)):
                 category = self.settings.value(f"{bases[i]}/game")
                 if self.selectedItems()[0].text().replace(" (Modded)", "") == category:
-                    self.selected_row = i
-                    self.modpack_selected = True
+                    self.selectedRow = i
+                    self.modpackSelected = True
                     self.files = self.selectedItems()[2].text().split(", ")
                     break
                 elif self.selectedItems()[0].text() == category:
-                    self.selected_row = i
-                    self.modpack_selected = False
+                    self.selectedRow = i
+                    self.modpackSelected = False
                     self.files.clear()
                     break
             self.settings.endGroup()
@@ -119,12 +119,12 @@ class GamesView(QtWidgets.QTableWidget):
     def eventFilter(self, object: QtCore.QObject, event: QtCore.QEvent) -> bool:
         if(event.type() == QtCore.QEvent.MouseButtonPress and event.buttons() == QtCore.Qt.RightButton and object is self.viewport()):
             item = self.itemAt(event.pos()).row()
-            row = self.row_data[item]
+            row = self.rowData[item]
             self.menu = QtWidgets.QMenu(self)
-            self.mods_view = ModsView(self)
+            self.modsView = ModsView(self)
             if row[2] == "modpack":
-                edit = self.menu.addAction("Edit modpack", self.mods_view.openFile)
-                delete = self.menu.addAction("Remove modpack", self.mods_view.rmFile)
+                edit = self.menu.addAction("Edit modpack", self.modsView.openFile)
+                delete = self.menu.addAction("Remove modpack", self.modsView.rmFile)
             else:
-                add = self.menu.addAction("Add modpack", self.mods_view.showWindow)
+                add = self.menu.addAction("Add modpack", self.modsView.showWindow)
         return super().eventFilter(object, event)

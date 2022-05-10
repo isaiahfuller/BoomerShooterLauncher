@@ -49,7 +49,7 @@ class GameScanner(QtWidgets.QFileDialog):
                 crc = "%X" % (prev & 0xFFFFFFFF)
                 crc = crc.lower()
                 found = False
-                if crc not in data.game_blacklist:
+                if crc not in data.gameBlacklist:
                     for i in game["releases"]:
                         if i["crc"] == crc:
                             base = game["name"]

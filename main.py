@@ -27,60 +27,60 @@ class MainWindow(QtWidgets.QMainWindow):
         self.readSettings()
         self.discord = Discord()
         
-        self.runner_list = RunnerView(self)
-        self.game_list = GamesView(self)
+        self.runnerList = RunnerView(self)
+        self.gameList = GamesView(self)
         self.process = GameLauncher(self)
-        self.discord_timer = QtCore.QTimer()
-        self.discord_details = ""
-        self.discord_state = ""
-        self.current_runners = []
-        self.current_versions = []
-        self.runner_text = ""
+        self.discordTimer = QtCore.QTimer()
+        self.discordDetails = ""
+        self.discordState = ""
+        self.currentRunners = []
+        self.currentVersions = []
+        self.runnerText = ""
         self.game_running = False
-        self.original_path = ""
+        self.originalPath = ""
 
-        self.game_list.setHorizontalHeaderLabels(["","Name","Files"])
+        self.gameList.setHorizontalHeaderLabels(["","Name","Files"])
         
         scroll = QtWidgets.QScrollArea()
         scroll.setHorizontalScrollBarPolicy(
             QtCore.Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         scroll.setWidgetResizable(True)
-        scroll.setWidget(self.game_list)
+        scroll.setWidget(self.gameList)
 
-        file_toolbar = self.addToolBar("Toolbar")
-        self.runner_toolbar = self.addToolBar("Launcher")
-        file_toolbar.setMovable(False)
+        fileToolbar = self.addToolBar("Toolbar")
+        self.runnerToolbar = self.addToolBar("Launcher")
+        fileToolbar.setMovable(False)
 
-        file_toolbar.addAction("&Add Runners", self.runner_list.showWindowFromMenu)
-        file_toolbar.addAction("&Add Games", self.gameScanner)
-        file_toolbar.addAction("&Add Modpack", self.showModWindow)
+        fileToolbar.addAction("&Add Runners", self.runnerList.showWindowFromMenu)
+        fileToolbar.addAction("&Add Games", self.gameScanner)
+        fileToolbar.addAction("&Add Modpack", self.showModWindow)
         if self.logger.level == logging.DEBUG:
-            file_toolbar.addAction("&Refresh", self.game_list.refresh)
+            fileToolbar.addAction("&Refresh", self.gameList.refresh)
         
-        self.runner_combobox = QtWidgets.QComboBox()
-        self.runner_combobox.addItem("Select a game first")
-        self.version_combobox = QtWidgets.QComboBox()
-        self.version_combobox.addItem("Versions")
-        self.launch_button = QtWidgets.QPushButton("Launch", self)
-        self.runner_combobox.setSizeAdjustPolicy(QtWidgets.QComboBox.AdjustToContents)
-        self.version_combobox.setSizeAdjustPolicy(QtWidgets.QComboBox.AdjustToContents)
-        self.runner_combobox.setEnabled(False)
-        self.version_combobox.setEnabled(False)
+        self.runnerCombobox = QtWidgets.QComboBox()
+        self.runnerCombobox.addItem("Select a game first")
+        self.versionCombobox = QtWidgets.QComboBox()
+        self.versionCombobox.addItem("Versions")
+        self.launchButton = QtWidgets.QPushButton("Launch", self)
+        self.runnerCombobox.setSizeAdjustPolicy(QtWidgets.QComboBox.AdjustToContents)
+        self.versionCombobox.setSizeAdjustPolicy(QtWidgets.QComboBox.AdjustToContents)
+        self.runnerCombobox.setEnabled(False)
+        self.versionCombobox.setEnabled(False)
 
-        self.runner_toolbar.addWidget(self.runner_combobox)
-        self.runner_toolbar.addWidget(self.version_combobox)
-        self.runner_toolbar.addWidget(self.launch_button)
+        self.runnerToolbar.addWidget(self.runnerCombobox)
+        self.runnerToolbar.addWidget(self.versionCombobox)
+        self.runnerToolbar.addWidget(self.launchButton)
 
-        self.runner_toolbar.setStyleSheet("QToolBar{spacing: 5px;}")
+        self.runnerToolbar.setStyleSheet("QToolBar{spacing: 5px;}")
 
-        self.game_list.itemSelectionChanged.connect(self.getRunners)
-        self.game_list.itemSelectionChanged.connect(self.getVersions)
+        self.gameList.itemSelectionChanged.connect(self.getRunners)
+        self.gameList.itemSelectionChanged.connect(self.getVersions)
 
-        self.launch_button.clicked.connect(self.launchGame)
-        self.game_list.cellActivated.connect(self.launchGame)
+        self.launchButton.clicked.connect(self.launchGame)
+        self.gameList.cellActivated.connect(self.launchGame)
 
-        self.discord_timer.start(30 * 1000)
-        self.discord_timer.timeout.connect(self.updateDiscordStatus)
+        self.discordTimer.start(30 * 1000)
+        self.discordTimer.timeout.connect(self.updateDiscordStatus)
         self.process.finished.connect(self.clearDiscordStatus)
         self.process.finished.connect(self.gameClosed)
         self.clearDiscordStatus()
@@ -107,13 +107,13 @@ class MainWindow(QtWidgets.QMainWindow):
         scanner = GameScanner(self)
         if scanner.exec():
             files = scanner.selectedFiles()
-            scanner.crc(files[0], self.game_list.refresh)
+            scanner.crc(files[0], self.gameList.refresh)
     
     def getRunners(self):
-        self.current_runners.clear()
-        self.runner_combobox.clear()
-        if(self.game_list.selectedIndexes()):
-            game = self.game_list.selectedItems()[0].text().replace(" (Modded)","")
+        self.currentRunners.clear()
+        self.runnerCombobox.clear()
+        if(self.gameList.selectedIndexes()):
+            game = self.gameList.selectedItems()[0].text().replace(" (Modded)","")
             
             self.game = game
             self.settings.beginGroup("Runners")
@@ -122,59 +122,59 @@ class MainWindow(QtWidgets.QMainWindow):
             for x in res:
                 for y in data.runners:
                     if game in data.runners[y]["games"] and x in y:
-                        self.current_runners.append(x)
+                        self.currentRunners.append(x)
                 if x not in data.runners:
-                    self.current_runners.append(x)
-            self.logger.debug(f"Compatible runners for \"{game}\": {self.current_runners}")
-            if(len(self.current_runners)) == 0:
-                self.runner_combobox.adjustSize()
-                self.runner_combobox.setEnabled(False)
-                self.runner_combobox.addItem("Add source port")
+                    self.currentRunners.append(x)
+            self.logger.debug(f"Compatible runners for \"{game}\": {self.currentRunners}")
+            if(len(self.currentRunners)) == 0:
+                self.runnerCombobox.adjustSize()
+                self.runnerCombobox.setEnabled(False)
+                self.runnerCombobox.addItem("Add source port")
             else:
-                self.runner_combobox.adjustSize()
-                self.runner_combobox.addItems(self.current_runners)
-                self.runner_combobox.setEnabled(True)
+                self.runnerCombobox.adjustSize()
+                self.runnerCombobox.addItems(self.currentRunners)
+                self.runnerCombobox.setEnabled(True)
         else:
-            self.runner_combobox.adjustSize()
-            self.runner_combobox.setEnabled(False)
-            self.runner_combobox.addItem("Select a game first")
+            self.runnerCombobox.adjustSize()
+            self.runnerCombobox.setEnabled(False)
+            self.runnerCombobox.addItem("Select a game first")
 
     def getVersions(self):
-        self.current_versions.clear()
-        self.version_combobox.clear()
-        if(self.game_list.selectedIndexes()):
+        self.currentVersions.clear()
+        self.versionCombobox.clear()
+        if(self.gameList.selectedIndexes()):
             self.settings.beginGroup("Games")
             bases = self.settings.childGroups()
             res = []
-            if "(Modded)" in self.game_list.selectedItems()[0].text():
-                game = self.game_list.selectedItems()[0].text().replace(" (Modded)", "")
+            if "(Modded)" in self.gameList.selectedItems()[0].text():
+                game = self.gameList.selectedItems()[0].text().replace(" (Modded)", "")
                 for i in bases:
                     if self.settings.value(f"{i}/game") == game:
                         self.settings.beginGroup(i)
                         res = res + self.settings.childGroups()
                         self.settings.endGroup()
             else:
-                game = self.game_list.selectedItems()[1].text()
+                game = self.gameList.selectedItems()[1].text()
                 self.settings.beginGroup(game)
                 res = self.settings.childGroups()
                 self.settings.endGroup()
             self.settings.endGroup()
             for x in res:
-                self.current_versions.append(x)
-            self.version_combobox.adjustSize()
-            self.version_combobox.addItems(self.current_versions)
-            self.version_combobox.setEnabled(True)
+                self.currentVersions.append(x)
+            self.versionCombobox.adjustSize()
+            self.versionCombobox.addItems(self.currentVersions)
+            self.versionCombobox.setEnabled(True)
             self.logger.debug(f"\"{game}\" versions: {res}")
         else:
-            self.version_combobox.adjustSize()
-            self.version_combobox.setEnabled(False)
-            self.version_combobox.addItem("Versions")
+            self.versionCombobox.adjustSize()
+            self.versionCombobox.setEnabled(False)
+            self.versionCombobox.addItem("Versions")
 
     def launchGame(self):
-        version_text = self.version_combobox.currentText()
-        self.runner_text = self.runner_combobox.currentText()
-        if "(Modded)" not in self.game_list.selectedItems()[0].text():
-            game = self.game_list.selectedItems()[1].text()
+        version_text = self.versionCombobox.currentText()
+        self.runnerText = self.runnerCombobox.currentText()
+        if "(Modded)" not in self.gameList.selectedItems()[0].text():
+            game = self.gameList.selectedItems()[1].text()
             self.settings.beginGroup(f"Games/{game}/{version_text}")
         else:
             keys = self.settings.allKeys()
@@ -184,16 +184,16 @@ class MainWindow(QtWidgets.QMainWindow):
                     self.settings.beginGroup(game)
         try:
             game = self.settings.value("path")
-            if len(self.current_runners) == 0:
-                self.runner_list.showWindow(self.game)
+            if len(self.currentRunners) == 0:
+                self.runnerList.showWindow(self.game)
             else:
-                self.original_path = os.getcwd()
-                if "(Modded)" in self.game_list.selectedItems()[0].text():
-                    self.process.runGame(self.game, game, self.runner_text, self.game_list.files)
+                self.originalPath = os.getcwd()
+                if "(Modded)" in self.gameList.selectedItems()[0].text():
+                    self.process.runGame(self.game, game, self.runnerText, self.gameList.files)
                 else:
-                    self.process.runGame(self.game, game, self.runner_text, [])
-                self.discord_details = f"Playing {self.game_list.game} with {self.runner_text}"
-                self.discord_state = version_text
+                    self.process.runGame(self.game, game, self.runnerText, [])
+                self.discordDetails = f"Playing {self.gameList.game} with {self.runnerText}"
+                self.discordState = version_text
                 self.game_running = True
                 self.updateDiscordStatus()
         except Exception as e:
@@ -203,7 +203,7 @@ class MainWindow(QtWidgets.QMainWindow):
             self.settings.endGroup()
         
     def showModWindow(self):
-        self.mod_list = ModsView(self.game_list)  
+        self.mod_list = ModsView(self.gameList)  
         self.mod_list.showWindow()
     
     def dragEnterEvent(self, event):
@@ -216,20 +216,20 @@ class MainWindow(QtWidgets.QMainWindow):
         scanner = GameScanner(self)
         files = [u.toLocalFile() for u in event.mimeData().urls()]
         for path in files:
-            scanner.directoryCrawl(path, self.game_list.refresh)
+            scanner.directoryCrawl(path, self.gameList.refresh)
         return super().dropEvent(event)
 
     def clearDiscordStatus(self):
-        self.discord_state = "Idle"
-        self.discord_details = "Looking at games"
+        self.discordState = "Idle"
+        self.discordDetails = "Looking at games"
         self.game_running = False
         self.updateDiscordStatus()
 
     def updateDiscordStatus(self):
-        self.discord.update(self.discord_state, self.discord_details, self.game_running)
+        self.discord.update(self.discordState, self.discordDetails, self.game_running)
     
     def gameClosed(self):
-        os.chdir(self.original_path)
+        os.chdir(self.originalPath)
 
     def closeEvent(self, event: QtGui.QCloseEvent) -> None:
         self.writeSettings()
