@@ -1,4 +1,4 @@
-# BoomerShooterLauncher
+# Boomer Shooter Launcher
 
 A launcher for old-school FPS games
 
