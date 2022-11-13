@@ -1,12 +1,15 @@
+"""Generate GamesView"""
 import os
 import platform
 import logging
 
-from PySide6 import QtCore, QtWidgets
 from pathlib import Path
-from mods_view import *
+from PySide6 import QtCore, QtWidgets
+from mods_view import ModsView
 
 class GamesView(QtWidgets.QTableWidget):
+    """Displays games in a table"""
+
     def __init__(self, parent):
         super().__init__(parent=parent)
         self.logger = logging.getLogger("Game List")
@@ -23,7 +26,7 @@ class GamesView(QtWidgets.QTableWidget):
         self.game = ""
         self.selectedRow = 0
         self.modpackSelected = False
-        
+
         self.setAlternatingRowColors(True)
         self.setWordWrap(False)
         self.verticalHeader().setVisible(False)
@@ -46,6 +49,7 @@ class GamesView(QtWidgets.QTableWidget):
         self.itemSelectionChanged.connect(self.updateRow)
 
     def refresh(self):
+        """Refresh list of games"""
         self.logger.info("Refreshing table")
         self.games.clear()
         self.rowData.clear()
@@ -54,12 +58,12 @@ class GamesView(QtWidgets.QTableWidget):
         self.setRowCount(len(self.settings.childGroups()))
         for i, base in enumerate(self.settings.childGroups(),start=0):
             self.settings.beginGroup(base)
-            list = (self.settings.value("game"), base, self.settings.value("version"))
-            self.rowData.append(list)
+            details = (self.settings.value("game"), base, self.settings.value("version"))
+            self.rowData.append(details)
             filesArray = []
-            for j, game in enumerate(self.settings.childGroups(), start=0):
+            for game in enumerate(self.settings.childGroups(), start=0):
                 self.setItem(i,0,QtWidgets.QTableWidgetItem(self.settings.value("game")))
-                self.settings.beginGroup(game)
+                self.settings.beginGroup(game[1])
                 self.setItem(i,1,QtWidgets.QTableWidgetItem(base))
                 fileNameSplit = self.settings.value("path").split(os.sep)
                 fileName = fileNameSplit[len(fileNameSplit) - 1]
@@ -72,6 +76,7 @@ class GamesView(QtWidgets.QTableWidget):
         self.loadModpacks()
 
     def loadModpacks(self):
+        """Refresh list of modpacks"""
         self.logger.info("Refreshing modpacks")
         self.settings.beginGroup("Modpacks")
         for pack in self.settings.childGroups():
@@ -82,31 +87,34 @@ class GamesView(QtWidgets.QTableWidget):
                 self.settings.setArrayIndex(i)
                 files.append(str(Path(self.settings.value("path")).resolve()))
             self.settings.endArray()
-            list = (self.settings.value("base") + " (Modded)", pack, "modpack", 0, "modpack", files)
+            details = (
+                self.settings.value("base") +
+                " (Modded)", pack, "modpack", 0, "modpack", files)
             items = self.findItems(self.settings.value("base"), QtCore.Qt.MatchExactly)
             if items:
                 pos = items[len(items) - 1].row() + 1
                 self.insertRow(pos)
-                self.rowData.insert(pos, list)
-                self.setItem(pos, 0, QtWidgets.QTableWidgetItem(list[0]))
-                self.setItem(pos, 1, QtWidgets.QTableWidgetItem(list[1]))
-                self.setItem(pos, 2, QtWidgets.QTableWidgetItem(", ".join(list[5])))
+                self.rowData.insert(pos, details)
+                self.setItem(pos, 0, QtWidgets.QTableWidgetItem(details[0]))
+                self.setItem(pos, 1, QtWidgets.QTableWidgetItem(details[1]))
+                self.setItem(pos, 2, QtWidgets.QTableWidgetItem(", ".join(details[5])))
             self.settings.endGroup()
         self.settings.endGroup()
 
     def updateRow(self):
+        """Stores information of the currently selected game"""
         if self.selectedItems():
             self.game = self.selectedItems()[1].text()
             self.settings.beginGroup("Games")
             bases = self.settings.childGroups()
-            for i in range(len(bases)):
-                category = self.settings.value(f"{bases[i]}/game")
+            for i, val in enumerate(bases):
+                category = self.settings.value(f"{val}/game")
                 if self.selectedItems()[0].text().replace(" (Modded)", "") == category:
                     self.selectedRow = i
                     self.modpackSelected = True
                     self.files = self.selectedItems()[2].text().split(", ")
                     break
-                elif self.selectedItems()[0].text() == category:
+                if self.selectedItems()[0].text() == category:
                     self.selectedRow = i
                     self.modpackSelected = False
                     self.files.clear()
@@ -114,17 +122,21 @@ class GamesView(QtWidgets.QTableWidget):
             self.settings.endGroup()
 
     def generateMenu(self, pos):
+        """Open menu at current cursor position"""
         self.menu.exec_(self.mapToGlobal(pos))
 
-    def eventFilter(self, object: QtCore.QObject, event: QtCore.QEvent) -> bool:
-        if(event.type() == QtCore.QEvent.MouseButtonPress and event.buttons() == QtCore.Qt.RightButton and object is self.viewport()):
+    def eventFilter(self, qobject: QtCore.QObject, event: QtCore.QEvent) -> bool:
+        """Create and populate context menu"""
+        # pylint: disable=attribute-defined-outside-init
+        if(event.type() == QtCore.QEvent.MouseButtonPress and
+        event.buttons() == QtCore.Qt.RightButton and qobject is self.viewport()):
             item = self.itemAt(event.pos()).row()
             row = self.rowData[item]
             self.menu = QtWidgets.QMenu(self)
-            self.modsView = ModsView(self)
+            modsView = ModsView(self)
             if row[2] == "modpack":
-                edit = self.menu.addAction("Edit modpack", self.modsView.openFile)
-                delete = self.menu.addAction("Remove modpack", self.modsView.rmFile)
+                self.menu.addAction("Edit modpack", modsView.openFile)
+                self.menu.addAction("Remove modpack", modsView.rmFile)
             else:
-                add = self.menu.addAction("Add modpack", self.modsView.showWindow)
-        return super().eventFilter(object, event)
+                self.menu.addAction("Add modpack", modsView.showWindow)
+        return super().eventFilter(qobject, event)

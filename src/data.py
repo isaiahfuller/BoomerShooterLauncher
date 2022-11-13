@@ -1,3 +1,4 @@
+"""Game and source port data"""
 games = {
     "doom.wad": {
         "name": "Doom",

@@ -1,22 +1,25 @@
+"""Launches game"""
 import os
 import logging
-import sys 
 import platform
-from PySide6 import QtCore, QtWidgets
 from pathlib import Path
+from PySide6 import QtCore, QtWidgets
 
 class GameLauncher(QtCore.QProcess):
+    """Launches game"""
     def __init__(self, parent):
         super().__init__(parent=parent)
         self.logger = logging.getLogger("Game Scanner")
-        match platform.system():    
+        match platform.system():
             case "Windows":
                 self.settings = QtCore.QSettings("fullerSpectrum", "Boomer Shooter Launcher")
             case "Linux":
                 self.settings = QtCore.QSettings("boomershooterlauncher", "config")
+        self.runner = None
         self.finished.connect(self.processFinished)
 
     def runGame(self, game, gamePath, runner, otherFiles):
+        """Launches game"""
         self.runner = runner
         self.settings.beginGroup("Runners")
         path = self.settings.value(f"{runner}/path")
@@ -42,18 +45,22 @@ class GameLauncher(QtCore.QProcess):
                 spArray.append("-file")
                 spArray.append(i)
         match platform.system():
-            case "Windows": runPath = Path(Path.home(), "AppData", "Roaming", "Boomer Shooter Launcher", "Saves", runner, self.parent().gameList.game)
-            case "Linux": runPath = Path(Path.home(), ".local", "share", "Boomer Shooter Launcher", runner, self.parent().gameList.game)
+            case "Windows": runPath = Path(Path.home(), "AppData", "Roaming",
+                "Boomer Shooter Launcher", "Saves", runner, self.parent().gameList.game)
+            case "Linux": runPath = Path(Path.home(), ".local", "share",
+                "Boomer Shooter Launcher", runner, self.parent().gameList.game)
         spArray.append("-savedir")
         spArray.append(str(runPath))
         os.makedirs(runPath, exist_ok=True)
         os.chdir(runPath)
         self.logger.debug(f"Array: {spArray}")
         self.start(spArray[0], spArray[1:])
-    
+
     def processFinished(self, exitCode):
+        """Show error if there was one"""
         self.logger.info("Game closed")
         if exitCode != 0:
             errorWindow = QtWidgets.QErrorMessage(parent=self.parent())
-            errorWindow.showMessage(f"{self.runner} exited with non-zero code {exitCode}. Double check your runner and game version if modded.")
+            errorWindow.showMessage(f"{self.runner} exited with non-zero code {exitCode}.\
+                                    Double check your runner and game version if modded.")
             self.logger.error(f"{self.runner} crashed. (Code {exitCode})")

@@ -1,15 +1,19 @@
+"""A game launcher for old FPS games"""
 import sys
-import data
+import os
+import logging
 import platform
-from discord import Discord
 from PySide6 import QtCore, QtWidgets, QtGui
-from games_view import *
-from scanner import *
-from runner_view import *
-from mods_view import *
-from launcher import *
+from discord import Discord
+import data
+from games_view import GamesView
+from scanner import GameScanner
+from runner_view import RunnerView
+from mods_view import ModsView
+from launcher import GameLauncher
 
 class MainWindow(QtWidgets.QMainWindow):
+    """Main launcher window"""
     def __init__(self):
         super().__init__()
         self.logger = logging.getLogger("Main window")
@@ -26,21 +30,23 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self.readSettings()
         self.discord = Discord()
-        
+
         self.runnerList = RunnerView(self)
         self.gameList = GamesView(self)
         self.process = GameLauncher(self)
+        self.game = None
         self.discordTimer = QtCore.QTimer()
         self.discordDetails = ""
         self.discordState = ""
         self.currentRunners = []
         self.currentVersions = []
+        self.mod_list = None
         self.runnerText = ""
         self.game_running = False
         self.originalPath = ""
 
         self.gameList.setHorizontalHeaderLabels(["","Name","Files"])
-        
+
         scroll = QtWidgets.QScrollArea()
         scroll.setHorizontalScrollBarPolicy(
             QtCore.Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
@@ -56,7 +62,7 @@ class MainWindow(QtWidgets.QMainWindow):
         fileToolbar.addAction("&Add Modpack", self.showModWindow)
         if self.logger.level == logging.DEBUG:
             fileToolbar.addAction("&Refresh", self.gameList.refresh)
-        
+
         self.runnerCombobox = QtWidgets.QComboBox()
         self.runnerCombobox.addItem("Select a game first")
         self.versionCombobox = QtWidgets.QComboBox()
@@ -90,43 +96,47 @@ class MainWindow(QtWidgets.QMainWindow):
         self.setAcceptDrops(True)
 
     def writeSettings(self):
+        """Write window geometry to registry"""
         self.settings.beginGroup("MainWindow")
         self.settings.setValue("geometry", self.saveGeometry())
         self.settings.endGroup()
 
     def readSettings(self):
+        """Read window geometry from registry"""
         self.settings.beginGroup("MainWindow")
         geometry = self.settings.value("geometry", QtCore.QByteArray())
-        if (geometry.isEmpty()):
+        if geometry.isEmpty():
             self.setGeometry(0, 0, 800, 600)
         else:
             self.restoreGeometry(geometry)
         self.settings.endGroup()
 
     def gameScanner(self):
+        """Scans files"""
         scanner = GameScanner(self)
         if scanner.exec():
             files = scanner.selectedFiles()
-            scanner.crc(files[0], self.gameList.refresh)
-    
+            scanner.directoryCrawl(files[0], self.gameList.refresh)
+
     def getRunners(self):
+        """Add all compatible source ports to combobox"""
         self.currentRunners.clear()
         self.runnerCombobox.clear()
-        if(self.gameList.selectedIndexes()):
+        if self.gameList.selectedIndexes():
             game = self.gameList.selectedItems()[0].text().replace(" (Modded)","")
-            
+
             self.game = game
             self.settings.beginGroup("Runners")
             res = self.settings.childGroups()
             self.settings.endGroup()
             for x in res:
-                for y in data.runners:
+                for y in data.runners: # pylint: disable=consider-using-dict-items
                     if game in data.runners[y]["games"] and x in y:
                         self.currentRunners.append(x)
                 if x not in data.runners:
                     self.currentRunners.append(x)
             self.logger.debug(f"Compatible runners for \"{game}\": {self.currentRunners}")
-            if(len(self.currentRunners)) == 0:
+            if len(self.currentRunners) == 0:
                 self.runnerCombobox.adjustSize()
                 self.runnerCombobox.setEnabled(False)
                 self.runnerCombobox.addItem("Add source port")
@@ -140,9 +150,10 @@ class MainWindow(QtWidgets.QMainWindow):
             self.runnerCombobox.addItem("Select a game first")
 
     def getVersions(self):
+        """Add all versions of the selected game to combobox"""
         self.currentVersions.clear()
         self.versionCombobox.clear()
-        if(self.gameList.selectedIndexes()):
+        if self.gameList.selectedIndexes():
             self.settings.beginGroup("Games")
             bases = self.settings.childGroups()
             res = []
@@ -171,6 +182,7 @@ class MainWindow(QtWidgets.QMainWindow):
             self.versionCombobox.addItem("Versions")
 
     def launchGame(self):
+        """Launch currently selected game with currently selected source port"""
         version_text = self.versionCombobox.currentText()
         self.runnerText = self.runnerCombobox.currentText()
         if "(Modded)" not in self.gameList.selectedItems()[0].text():
@@ -196,23 +208,26 @@ class MainWindow(QtWidgets.QMainWindow):
                 self.discordState = version_text
                 self.game_running = True
                 self.updateDiscordStatus()
-        except Exception as e:
+        except Exception as e: # pylint: disable=broad-except
             self.logger.exception(e)
             self.logger.error("Failed to launch game")
         finally:
             self.settings.endGroup()
-        
+
     def showModWindow(self):
-        self.mod_list = ModsView(self.gameList)  
+        """Creates and displays the mod editor window"""
+        self.mod_list = ModsView(self.gameList)
         self.mod_list.showWindow()
-    
+
     def dragEnterEvent(self, event):
+        """Filters things dragged into window"""
         if event.mimeData().hasUrls():
             event.accept()
         else:
             event.ignore()
 
     def dropEvent(self, event):
+        """Scans files and folders dropped onto the window as games"""
         scanner = GameScanner(self)
         files = [u.toLocalFile() for u in event.mimeData().urls()]
         for path in files:
@@ -220,18 +235,22 @@ class MainWindow(QtWidgets.QMainWindow):
         return super().dropEvent(event)
 
     def clearDiscordStatus(self):
+        """Changes discord status after game closes"""
         self.discordState = "Idle"
         self.discordDetails = "Looking at games"
         self.game_running = False
         self.updateDiscordStatus()
 
     def updateDiscordStatus(self):
-        self.discord.update(self.discordState, self.discordDetails, self.game_running)
-    
+        """Updates Discord status"""
+        self.discord.update(self.discordState, self.discordDetails)
+
     def gameClosed(self):
+        """Changes working directory after game closes"""
         os.chdir(self.originalPath)
 
     def closeEvent(self, event: QtGui.QCloseEvent) -> None:
+        """Saves settings before closing"""
         self.writeSettings()
         return super().closeEvent(event)
 

@@ -10,7 +10,10 @@
       "request": "launch",
       "module": "main",
       "justMyCode": true,
-      "args": ["--debug"]
+      "cwd": "${workspaceFolder}/src",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}"
+      }
     }
   ]
 }

@@ -1,0 +1,11 @@
+{
+  "python.linting.pylintEnabled": true,
+  "python.linting.enabled": true,
+  "python.linting.pylintArgs": [
+    "--disable=invalid-name",
+    "--disable=c-extension-no-member",
+    "--disable=logging-fstring-interpolation",
+    "--disable=too-many-instance-attributes",
+    "--disable=too-many-statements"
+  ]
+}

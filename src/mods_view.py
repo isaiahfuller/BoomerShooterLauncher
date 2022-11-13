@@ -1,3 +1,4 @@
+"""The module for the modpack window"""
 import os
 import platform
 import logging
@@ -5,6 +6,7 @@ from PySide6 import QtCore, QtWidgets, QtGui
 
 
 class ModsView(QtWidgets.QMainWindow):
+    """Modpack editor window"""
     def __init__(self, parent):
         super().__init__(parent=parent)
         self.setWindowModality(QtCore.Qt.ApplicationModal)
@@ -117,20 +119,25 @@ class ModsView(QtWidgets.QMainWindow):
         self.modNameEdit.textEdited.connect(self.changeModName)
         self.modSourceEdit.textEdited.connect(self.changeModSource)
 
+        self.selected = None
+
         self.setCentralWidget(scroll)
 
     def dragEnterEvent(self, event):
+        """Filters things dragged into window"""
         if event.mimeData().hasUrls():
             event.accept()
         else:
             event.ignore()
 
     def dropEvent(self, event):
+        """Adds drag and dropped file to mod list"""
         files = [u.toLocalFile() for u in event.mimeData().urls()]
         for path in files:
             self.addFileToList(path)
 
     def addFileToList(self, filePath):
+        """Adds mod to mod pack"""
         fileSplit = filePath.split("/")
         fileName = fileSplit[len(fileSplit) - 1]
         nameSplit = fileName.split(".")
@@ -150,6 +157,7 @@ class ModsView(QtWidgets.QMainWindow):
             self.modList.addItem(fileName)
 
     def baseComboBuilder(self):
+        """Generate base game combo box options"""
         self.baseSelect.clear()
         self.settings.beginGroup("Games")
         bases = []
@@ -162,9 +170,11 @@ class ModsView(QtWidgets.QMainWindow):
         self.mods["base"] = bases[0]
 
     def baseChanged(self, text):
+        """Updates var on change"""
         self.mods["base"] = text
 
     def selectedModChanged(self, currentRow):
+        """Updates vars on change"""
         self.modNameEdit.setText(self.mods["files"][currentRow]["name"])
         self.modSourceEdit.setText(self.mods["files"][currentRow]["source"])
         self.pathLabel.setText(self.mods["files"][currentRow]["path"])
@@ -180,16 +190,19 @@ class ModsView(QtWidgets.QMainWindow):
             self.downButton.setDisabled(False)
 
     def removeMod(self):
+        """Removes mod from list"""
         row = self.modList.currentRow()
         self.modList.takeItem(row)
         self.mods["files"].pop(row)
 
     def addMod(self):
+        """Open file chooser for mod file"""
         files = self.fileChooser.getOpenFileUrls()
         for file in files[0]:
             self.addFileToList(str(file.toLocalFile()))
 
     def changeModPosition(self, i):
+        """Reorder mod entry"""
         row = self.modList.currentRow()
         tempRow = self.modList.takeItem(row+i)
         tempObj = self.mods["files"][row+i]
@@ -199,12 +212,15 @@ class ModsView(QtWidgets.QMainWindow):
         self.selected = self.modList.currentRow()
 
     def moveUp(self):
+        """Calls changeModPosition"""
         self.changeModPosition(-1)
 
     def moveDown(self):
+        """Calls changeModPosition"""
         self.changeModPosition(1)
 
     def saveFile(self):
+        """Saves modpack to registry"""
         name = self.mods["name"]
         if name != "":
             self.settings.beginGroup(f"Modpacks/{name}")
@@ -221,15 +237,19 @@ class ModsView(QtWidgets.QMainWindow):
             self.close()
 
     def changeName(self, text):
+        """Change name of mod file"""
         self.mods["name"] = text
 
     def changeModName(self, text):
+        """Change name of mod pack"""
         self.mods["files"][self.selected]["name"] = text
 
     def changeModSource(self, text):
+        """Change source url of mod pack"""
         self.mods["files"][self.selected]["source"] = text
 
     def showWindow(self):
+        """Displays the window"""
         self.setFixedSize(500, 500)
         mainLocation = self.parent().parent().parent().parent().frameGeometry()
         x = mainLocation.x() + mainLocation.width() / 2 - self.width() / 2
@@ -238,10 +258,12 @@ class ModsView(QtWidgets.QMainWindow):
         self.show()
 
     def closeEvent(self, event: QtGui.QCloseEvent) -> None:
+        """Refreshes game list while closing modpack menu"""
         self.gameList.refresh()
         return super().closeEvent(event)
 
     def openFile(self):
+        """Loads mod pack from registry"""
         name = self.gameList.selectedItems()[1].text()
         self.settings.beginGroup(f"Modpacks/{name}")
         self.nameEdit.setText(name)
@@ -254,8 +276,11 @@ class ModsView(QtWidgets.QMainWindow):
             fileSplit = self.settings.value("path").split(os.sep)
             fileName = fileSplit[len(fileSplit) - 1]
             self.modList.addItem(fileName)
-            self.mods["files"].append({"name": self.settings.value(
-                "name"), "path": self.settings.value("path"), "source": self.settings.value("source")})
+            self.mods["files"].append({
+                    "name": self.settings.value("name"),
+                    "path": self.settings.value("path"),
+                    "source": self.settings.value("source")
+                })
         self.settings.endArray()
         self.modNameEdit.setText(self.settings.value("files/1/name"))
         self.pathLabel.setText(self.settings.value("files/1/path"))
@@ -264,7 +289,8 @@ class ModsView(QtWidgets.QMainWindow):
         self.showWindow()
 
     def rmFile(self):
+        """Removes mod pack"""
         name = self.gameList.selectedItems()[1].text()
-        self.settings.remove(f"Modpacks/{name}")
-        self.logger.info(f"Removing {name}")
+        self.settings.remove("Modpacks/%s", name)
+        self.logger.info("Removing %s", name)
         self.gameList.refresh()
