@@ -34,9 +34,9 @@ class MainWindow(QtWidgets.QMainWindow):
         self.readSettings()
         self.discord = Discord()
 
-        self.runnerList = RunnerView(self)
         self.gameList = GamesView(self)
-        self.process = GameLauncher(self)
+        self.runnerList = None
+        self.process = None
         self.game = None
         self.discordTimer = QtCore.QTimer()
         self.discordDetails = ""
@@ -60,7 +60,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.runnerToolbar = self.addToolBar("Launcher")
         fileToolbar.setMovable(False)
 
-        fileToolbar.addAction("&Add Runners", self.runnerList.showWindowFromMenu)
+        fileToolbar.addAction("&Add Runners", self.showRunnerList)
         fileToolbar.addAction("&Add Games", self.gameScanner)
         fileToolbar.addAction("&Add Modpack", self.showModWindow)
         if self.logger.level == logging.DEBUG:
@@ -90,8 +90,6 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self.discordTimer.start(30 * 1000)
         self.discordTimer.timeout.connect(self.updateDiscordStatus)
-        self.process.finished.connect(self.clearDiscordStatus)
-        self.process.finished.connect(self.gameClosed)
         self.clearDiscordStatus()
         self.updateDiscordStatus()
 
@@ -186,8 +184,13 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def launchGame(self):
         """Launch currently selected game with currently selected source port"""
+        if self.runnerList == None:
+            self.runnerList = RunnerView(self)
         version_text = self.versionCombobox.currentText()
         self.runnerText = self.runnerCombobox.currentText()
+        self.process = GameLauncher(self)
+        self.process.finished.connect(self.clearDiscordStatus)
+        self.process.finished.connect(self.gameClosed)
         if "(Modded)" not in self.gameList.selectedItems()[0].text():
             game = self.gameList.selectedItems()[1].text()
             self.settings.beginGroup(f"Games/{game}/{version_text}")
@@ -214,13 +217,22 @@ class MainWindow(QtWidgets.QMainWindow):
         except Exception as e: # pylint: disable=broad-except
             self.logger.exception(e)
             self.logger.error("Failed to launch game")
+            errorWindow = QtWidgets.QErrorMessage(self)
+            errorWindow.showMessage(f"Failed to launch game ({e})")
         finally:
             self.settings.endGroup()
+            self.process = None
+            self.runnerList = None
 
     def showModWindow(self):
         """Creates and displays the mod editor window"""
         self.mod_list = ModsView(self.gameList)
         self.mod_list.showWindow()
+
+    def showRunnerList(self):
+        """Creates and displays the runner window"""
+        self.runnerList = RunnerView(self)
+        self.runnerList.showWindowFromMenu()
 
     def dragEnterEvent(self, event):
         """Filters things dragged into window"""
@@ -255,6 +267,7 @@ class MainWindow(QtWidgets.QMainWindow):
     def closeEvent(self, event: QtGui.QCloseEvent) -> None:
         """Saves settings before closing"""
         self.writeSettings()
+        self.discord.clear()
         return super().closeEvent(event)
 
 if __name__ == "__main__":

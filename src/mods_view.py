@@ -260,6 +260,7 @@ class ModsView(QtWidgets.QMainWindow):
     def closeEvent(self, event: QtGui.QCloseEvent) -> None:
         """Refreshes game list while closing modpack menu"""
         self.gameList.refresh()
+        self.deleteLater()
         return super().closeEvent(event)
 
     def openFile(self):

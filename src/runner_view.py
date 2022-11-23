@@ -13,7 +13,7 @@ class RunnerView(QtWidgets.QMainWindow):
     def __init__(self, parent):
         super().__init__(parent=parent)
         self.setWindowModality(QtCore.Qt.ApplicationModal)
-        self.logger = logging.getLogger("Modpack Editor")
+        self.logger = logging.getLogger("Runner Editor")
 
         match platform.system():
             case "Windows":

@@ -33,5 +33,9 @@ class Discord:
                 self.state = newState
                 self.details = newDetails
                 self.logger.info("Status updated")
-                
             self.RPC.update(state = newState, details = newDetails, start = self.current_time)
+
+    def clear(self):
+        """Clears presence"""
+        self.RPC.clear()
+        self.RPC.close()

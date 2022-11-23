@@ -9,7 +9,7 @@ class GameLauncher(QtCore.QProcess):
     """Launches game"""
     def __init__(self, parent):
         super().__init__(parent=parent)
-        self.logger = logging.getLogger("Game Scanner")
+        self.logger = logging.getLogger("Launcher")
         match platform.system():
             case "Windows":
                 self.settings = QtCore.QSettings("fullerSpectrum", "Boomer Shooter Launcher")
@@ -29,6 +29,8 @@ class GameLauncher(QtCore.QProcess):
         self.logger.debug(f"Path: {path}")
         self.logger.debug(f"Other files: {otherFiles}")
         runnerPath = Path(self.settings.value(f"{runner}/path"))
+        if not Path(path).is_file():
+            raise FileNotFoundError("Runner executable missing")
         gameDir = str(gamePath).split(os.sep)
         gameDir.pop(len(gameDir) - 1)
         gameDir = Path("/".join(gameDir))
@@ -59,7 +61,7 @@ class GameLauncher(QtCore.QProcess):
         self.logger.debug(f"Array: {spArray}")
         self.start(spArray[0], spArray[1:])
 
-    def processFinished(self, exitCode):
+    def processFinished(self, exitCode=0):
         """Show error if there was one"""
         self.logger.info("Game closed")
         if exitCode != 0:

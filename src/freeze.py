@@ -48,7 +48,7 @@ build_exe_options = {
     "zip_include_packages": ["PySide6"],
 }
 
-executables = [Executable("src/main.py", base=base)]
+executables = [Executable("main.py", base=base)]
 
 setup(
     name="Boomer Shooter Launcher",
