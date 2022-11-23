@@ -5,3 +5,9 @@ PySide6
 python-dotenv
 shiboken6
 toml
+zlib
+pathlib
+webbrowser
+subprocess
+platform
+logging

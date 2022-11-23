@@ -20,6 +20,7 @@ class GameLauncher(QtCore.QProcess):
 
     def runGame(self, game, gamePath, runner, otherFiles):
         """Launches game"""
+        # pylint: disable=anomalous-backslash-in-string
         self.runner = runner
         self.settings.beginGroup("Runners")
         path = self.settings.value(f"{runner}/path")
@@ -32,6 +33,8 @@ class GameLauncher(QtCore.QProcess):
         gameDir.pop(len(gameDir) - 1)
         gameDir = Path("/".join(gameDir))
         spArray = [""]*3
+        filteredTitle = self.parent().gameList.game
+        filteredTitle = "".join(x for x in filteredTitle if x not in "\/:*?<>|\"")
         self.settings.endGroup()
         if game in ["Duke Nukem 3D", "Ion Fury"]:
             spArray = [str(runnerPath), "-usecwd", "-nosetup",
@@ -46,9 +49,9 @@ class GameLauncher(QtCore.QProcess):
                 spArray.append(i)
         match platform.system():
             case "Windows": runPath = Path(Path.home(), "AppData", "Roaming",
-                "Boomer Shooter Launcher", "Saves", runner, self.parent().gameList.game)
+                "Boomer Shooter Launcher", "Saves", runner, filteredTitle)
             case "Linux": runPath = Path(Path.home(), ".local", "share",
-                "Boomer Shooter Launcher", runner, self.parent().gameList.game)
+                "Boomer Shooter Launcher", runner, filteredTitle)
         spArray.append("-savedir")
         spArray.append(str(runPath))
         os.makedirs(runPath, exist_ok=True)

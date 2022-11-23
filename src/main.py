@@ -11,6 +11,7 @@ from scanner import GameScanner
 from runner_view import RunnerView
 from mods_view import ModsView
 from launcher import GameLauncher
+from theme import Theme
 
 class MainWindow(QtWidgets.QMainWindow):
     """Main launcher window"""
@@ -21,6 +22,8 @@ class MainWindow(QtWidgets.QMainWindow):
             self.logger.setLevel(logging.DEBUG)
             self.logger.debug("Debug mode")
         self.platform = platform.system()
+
+        self.theme = Theme(app.setStyleSheet)
 
         match self.platform:
             case "Windows":
