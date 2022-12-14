@@ -30,7 +30,7 @@ class GameLauncher(QtCore.QProcess):
         self.logger.debug(f"Other files: {otherFiles}")
         runnerPath = Path(self.settings.value(f"{runner}/path"))
         if not Path(path).is_file():
-            raise FileNotFoundError("Runner executable missing")
+            raise FileNotFoundError("Executable missing")
         gameDir = str(gamePath).split(os.sep)
         gameDir.pop(len(gameDir) - 1)
         gameDir = Path("/".join(gameDir))
@@ -38,17 +38,10 @@ class GameLauncher(QtCore.QProcess):
         filteredTitle = self.parent().gameList.game
         filteredTitle = "".join(x for x in filteredTitle if x not in "\/:*?<>|\"")
         self.settings.endGroup()
-        if game in ["Duke Nukem 3D", "Ion Fury"]:
-            spArray = [str(runnerPath), "-usecwd", "-nosetup",
-                    "-gamegrp", gamePath, "-game_dir", str(gameDir)]
-            for i in otherFiles:
-                spArray.append("-file")
-                spArray.append(i)
-        else:
-            spArray = [str(runnerPath), "-iwad", gamePath]
-            for i in otherFiles:
-                spArray.append("-file")
-                spArray.append(i)
+        spArray = [str(runnerPath), "-iwad", gamePath]
+        for i in otherFiles:
+            spArray.append("-file")
+            spArray.append(i)
         match platform.system():
             case "Windows": runPath = Path(Path.home(), "AppData", "Roaming",
                 "Boomer Shooter Launcher", "Saves", runner, filteredTitle)

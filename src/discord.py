@@ -17,12 +17,17 @@ class Discord:
         self.state = ""
         self.details = ""
         try:
+            if client_id is None:
+                raise ValueError()
             self.RPC = Presence(client_id)
             self.RPC.connect()
             self.failed = False
         except DiscordError:
             self.failed = True
             self.logger.warning("Failed to connect")
+        except ValueError:
+            self.failed = True 
+            self.logger.warning("No ClientID provided")
 
 
     def update(self, newState, newDetails):
@@ -37,5 +42,6 @@ class Discord:
 
     def clear(self):
         """Clears presence"""
-        self.RPC.clear()
-        self.RPC.close()
+        if not self.failed:
+            self.RPC.clear()
+            self.RPC.close()

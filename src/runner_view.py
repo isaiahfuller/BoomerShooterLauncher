@@ -184,4 +184,5 @@ class RunnerView(QtWidgets.QMainWindow):
         self.runnerList.clear()
         self.openedFromMenu = False
         self.parent().getRunners()
+        self.deleteLater()
         return super().closeEvent(event)

@@ -389,31 +389,6 @@ games = {
 
         ]
     },
-    "duke3d.grp": {
-        "name": "Duke Nukem 3D",
-        "year": 1996,
-        "runner": "build",
-        "game": "Duke Nukem 3D",
-        "releases": [
-            {
-                "crc": "fd3dcff1",
-                "version": "1.5 atomic",
-                "name": "Duke Nukem 3D v1.5 Atomic"
-            },
-            {
-                "crc": "982afe4a",
-                "version": "randy",
-                "name": "Duke Nukem 3D: 20th Anniversary World Tour"
-            }
-        ]
-    },
-    "fury.grp": {
-        "name": "Ion Fury",
-        "year": 2018,
-        "runner": "build",
-        "game": "Ion Fury",
-        "releases": []
-    },
     "hedon.ipk3": {
         "name": "Hedon Bloodrite",
         "year": 2019,
@@ -482,23 +457,5 @@ runners = {
         "description": "\"Modified PrBoom port with uncapped framerate, variable gamespeed, re-record, walkcam, chasecam, full mouselook, fov and other features without loss of compatibility with original DOOM.\"",
         "games": ["Doom", "Doom II", "Final Doom", "Chex Quest"],
         "executable": "prboom-plus"
-    },
-    "Rednukem": {
-        "link": "https://lerppu.net/wannabethesis/",
-        "description": "\"A highly accurate Duke 3D port, with additional support for reverse-engineered implementaions of Duke Nukem 64, Redneck Rampage and RR:RA\"",
-        "games": [
-                "Duke Nukem 3D",
-                "Duke Nukem 64"
-        ],
-        "executable": "rednukem"
-    },
-    "EDuke32": {
-        "link": "https://dukeworld.com/eduke32/synthesis/latest/",
-        "description": "\"An awesome, free homebrew game engine and source port of the classic PC first person shooter Duke Nukem 3D.\"",
-        "games": [
-                "Duke Nukem 3D",
-                "Ion Fury"
-        ],
-        "executable": "eduke32"
     }
 }

@@ -3,6 +3,7 @@ import sys
 import os
 import logging
 import platform
+import gc
 from PySide6 import QtCore, QtWidgets, QtGui
 from discord import Discord
 import data
@@ -17,6 +18,7 @@ class MainWindow(QtWidgets.QMainWindow):
     """Main launcher window"""
     def __init__(self):
         super().__init__()
+        self.status = self.statusBar()
         self.logger = logging.getLogger("Main window")
         if "--debug" in sys.argv:
             self.logger.setLevel(logging.DEBUG)
@@ -56,6 +58,13 @@ class MainWindow(QtWidgets.QMainWindow):
         scroll.setWidgetResizable(True)
         scroll.setWidget(self.gameList)
 
+        menuBar = self.menuBar()
+        menu = QtWidgets.QMenu("&File", parent=menuBar)
+        menuBar.addMenu(menu)
+        menu.addAction("&Add Runners", self.showRunnerList)
+        menu.addAction("&Add Games", self.gameScanner)
+        menu.addAction("&Add Modpack", self.showModWindow)
+
         fileToolbar = self.addToolBar("Toolbar")
         self.runnerToolbar = self.addToolBar("Launcher")
         fileToolbar.setMovable(False)
@@ -89,9 +98,9 @@ class MainWindow(QtWidgets.QMainWindow):
         self.gameList.cellActivated.connect(self.launchGame)
 
         self.discordTimer.start(30 * 1000)
-        self.discordTimer.timeout.connect(self.updateDiscordStatus)
-        self.clearDiscordStatus()
-        self.updateDiscordStatus()
+        self.discordTimer.timeout.connect(self.updateStatus)
+        self.clearStatus()
+        self.updateStatus()
 
         self.setCentralWidget(scroll)
         self.setAcceptDrops(True)
@@ -114,10 +123,14 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def gameScanner(self):
         """Scans files"""
+        self.status.showMessage("Scanning games...")
         scanner = GameScanner(self)
         if scanner.exec():
             files = scanner.selectedFiles()
             scanner.directoryCrawl(files[0], self.gameList.refresh)
+        self.clearStatus()
+        self.gameList.refresh()
+        scanner = None
 
     def getRunners(self):
         """Add all compatible source ports to combobox"""
@@ -189,7 +202,7 @@ class MainWindow(QtWidgets.QMainWindow):
         version_text = self.versionCombobox.currentText()
         self.runnerText = self.runnerCombobox.currentText()
         self.process = GameLauncher(self)
-        self.process.finished.connect(self.clearDiscordStatus)
+        self.process.finished.connect(self.clearStatus)
         self.process.finished.connect(self.gameClosed)
         if "(Modded)" not in self.gameList.selectedItems()[0].text():
             game = self.gameList.selectedItems()[1].text()
@@ -213,7 +226,8 @@ class MainWindow(QtWidgets.QMainWindow):
                 self.discordDetails = f"Playing {self.gameList.game} with {self.runnerText}"
                 self.discordState = version_text
                 self.game_running = True
-                self.updateDiscordStatus()
+                self.updateStatus()
+                self.status.showMessage(f"{self.discordDetails} ({version_text})")
         except Exception as e: # pylint: disable=broad-except
             self.logger.exception(e)
             self.logger.error("Failed to launch game")
@@ -228,11 +242,14 @@ class MainWindow(QtWidgets.QMainWindow):
         """Creates and displays the mod editor window"""
         self.mod_list = ModsView(self.gameList)
         self.mod_list.showWindow()
+        self.mod_list = None
 
     def showRunnerList(self):
         """Creates and displays the runner window"""
         self.runnerList = RunnerView(self)
         self.runnerList.showWindowFromMenu()
+        self.runnerList = None
+        gc.collect()
 
     def dragEnterEvent(self, event):
         """Filters things dragged into window"""
@@ -247,17 +264,19 @@ class MainWindow(QtWidgets.QMainWindow):
         files = [u.toLocalFile() for u in event.mimeData().urls()]
         for path in files:
             scanner.directoryCrawl(path, self.gameList.refresh)
+            self.gameList.refresh()
         return super().dropEvent(event)
 
-    def clearDiscordStatus(self):
-        """Changes discord status after game closes"""
+    def clearStatus(self):
+        """Changes status after game closes"""
         self.discordState = "Idle"
         self.discordDetails = "Looking at games"
         self.game_running = False
-        self.updateDiscordStatus()
+        self.status.showMessage("Idle...")
+        self.updateStatus()
 
-    def updateDiscordStatus(self):
-        """Updates Discord status"""
+    def updateStatus(self):
+        """Updates status"""
         self.discord.update(self.discordState, self.discordDetails)
 
     def gameClosed(self):

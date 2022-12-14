@@ -3,40 +3,60 @@ import os
 import zlib
 import logging
 import platform
-from PySide6 import QtWidgets, QtCore
+import threading
+from threading import Thread
+from PySide6 import QtGui, QtWidgets, QtCore
 import data
 
 class GameScanner(QtWidgets.QFileDialog):
     """File chooser"""
     def __init__(self, parent):
         super().__init__(parent=parent)
+        self.refresh = None
+        self.status = parent.status
+        self.clearStatus = parent.clearStatus
         self.logger = logging.getLogger("Game Scanner")
+        self.timer = None
         match platform.system():
             case "Windows":
                 self.settings = QtCore.QSettings("fullerSpectrum", "Boomer Shooter Launcher")
             case "Linux":
                 self.settings = QtCore.QSettings("boomershooterlauncher", "config")
-        self.fileTypes = ("wad", "grp", "ipk3")
+        self.fileTypes = ("wad", "pk3", "ipk3")
         self.setFileMode(QtWidgets.QFileDialog.ExistingFiles)
-        self.setNameFilter("Game files (*)")
+        self.setNameFilter("Game files (*.wad, *.pk3, *.ipk3)")
 
     def directoryCrawl(self, fileName, tableRefresh):
         """Enumerate files and directories"""
+        self.refresh = tableRefresh
         self.logger.info(f"Scanning directory {fileName}")
         if os.path.isdir(fileName):
-            for (dirpath, dirnames, filenames) in os.walk(fileName): # pylint: disable=unused-variable
-                for file in filenames:
-                    if file.lower().endswith(self.fileTypes):
-                        self.logger.debug(f"Scanning {file}")
-                        self.individualFile(os.path.join(dirpath, file))
+            self.timer = threading.Timer(0.1, self.refresh)
+            self.timer.start()
+            t = Thread(target=self.directoryThread, args=(fileName,))
+            t.daemon = True
+            t.start()
         else:
             self.individualFile(fileName)
-        tableRefresh()
+        self.close()
 
+    def directoryThread(self, fileName):
+        """Enumerate files and directories"""
+        for (dirpath, dirnames, filenames) in os.walk(fileName): # pylint: disable=unused-variable
+            for file in filenames:
+                if file.lower().endswith(self.fileTypes):
+                    self.timer.cancel()
+                    self.logger.debug(f"Scanning {file}")
+                    self.individualFile(os.path.join(dirpath, file))
+                    self.timer = threading.Timer(0.1, self.refresh)
+                    self.timer.start()
+        self.clearStatus()
+        self.refresh()
 
     def individualFile(self, fileName):
         """Scans file crc"""
         fileName = os.path.realpath(fileName)
+        self.status.showMessage(f"Scanning games... ({fileName})")
         prev = 0
         fileNameSplit = fileName.split(os.sep)
         gameFileName = fileNameSplit[len(fileNameSplit) - 1]
@@ -83,3 +103,9 @@ class GameScanner(QtWidgets.QFileDialog):
             except Exception as e: # pylint: disable=broad-except
                 self.logger.exception(e)
                 self.logger.warning(f"Failed to scan file {fileName}")
+
+    def closeEvent(self, arg__1: QtGui.QCloseEvent) -> None:
+        """Releases memory on close"""
+        self.refresh()
+        self.deleteLater()
+        return super().closeEvent(arg__1)
