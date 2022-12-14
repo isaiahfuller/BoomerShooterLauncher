@@ -2,6 +2,7 @@
 import os
 import platform
 import logging
+import json
 from PySide6 import QtCore, QtWidgets, QtGui
 
 
@@ -91,9 +92,11 @@ class ModsView(QtWidgets.QMainWindow):
         modInfoGrid.addWidget(self.modSourceEdit, 1, 1)
         modInfoGrid.addWidget(self.pathLabel, 2, 1)
 
+        exportPackButton = QtWidgets.QPushButton("Export", self)
         addFileButton = QtWidgets.QPushButton("Add", self)
         removeFileButton = QtWidgets.QPushButton("Remove", self)
         saveButton = QtWidgets.QPushButton("Save", self)
+        footer.addWidget(exportPackButton)
         footer.addWidget(addFileButton)
         footer.addWidget(removeFileButton)
         footer.addWidget(saveButton)
@@ -118,6 +121,7 @@ class ModsView(QtWidgets.QMainWindow):
         self.nameEdit.textEdited.connect(self.changeName)
         self.modNameEdit.textEdited.connect(self.changeModName)
         self.modSourceEdit.textEdited.connect(self.changeModSource)
+        exportPackButton.clicked.connect(self.exportJson)
 
         self.selected = None
 
@@ -295,3 +299,21 @@ class ModsView(QtWidgets.QMainWindow):
         self.settings.remove("Modpacks/%s", name)
         self.logger.info("Removing %s", name)
         self.gameList.refresh()
+
+    def exportJson(self):
+        """Save current modpack to json file"""
+        save_to = QtWidgets.QFileDialog().getSaveFileName(self, "Save To...",
+            filter="JSON (*.json)")
+        self.logger.info("Saving JSON to: %s", save_to[0])
+        if not save_to[0]:
+            return
+        data = {
+            "name": self.mods["name"],
+            "base": self.mods["base"],
+        }
+        mods = self.mods["files"]
+        for mod in mods:
+            mod.pop("path", None)
+        data["mods"] = mods
+        with open(save_to[0], "w", encoding="utf-8") as outfile:
+            outfile.write(json.dumps(data, indent=4))

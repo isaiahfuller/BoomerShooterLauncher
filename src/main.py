@@ -184,7 +184,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def launchGame(self):
         """Launch currently selected game with currently selected source port"""
-        if self.runnerList == None:
+        if self.runnerList is None:
             self.runnerList = RunnerView(self)
         version_text = self.versionCombobox.currentText()
         self.runnerText = self.runnerCombobox.currentText()

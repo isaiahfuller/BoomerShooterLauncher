@@ -54,7 +54,10 @@ class GameLauncher(QtCore.QProcess):
                 "Boomer Shooter Launcher", "Saves", runner, filteredTitle)
             case "Linux": runPath = Path(Path.home(), ".local", "share",
                 "Boomer Shooter Launcher", runner, filteredTitle)
-        spArray.append("-savedir")
+        match runner:
+            case "PrBoom+": savedir = "-save"
+            case _: savedir = "-savedir"
+        spArray.append(savedir)
         spArray.append(str(runPath))
         os.makedirs(runPath, exist_ok=True)
         os.chdir(runPath)
