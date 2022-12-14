@@ -61,9 +61,10 @@ class MainWindow(QtWidgets.QMainWindow):
         menuBar = self.menuBar()
         menu = QtWidgets.QMenu("&File", parent=menuBar)
         menuBar.addMenu(menu)
-        menu.addAction("&Add Runners", self.showRunnerList)
-        menu.addAction("&Add Games", self.gameScanner)
-        menu.addAction("&Add Modpack", self.showModWindow)
+        menu.addAction("Add &Runners", self.showRunnerList)
+        menu.addAction("Add &Games", self.gameScanner)
+        menu.addAction("Add &Modpack", self.showModWindow)
+        menu.addAction("&Exit", self.close)
 
         fileToolbar = self.addToolBar("Toolbar")
         self.runnerToolbar = self.addToolBar("Launcher")
