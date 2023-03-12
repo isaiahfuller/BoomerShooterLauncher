@@ -4,6 +4,7 @@ import os
 import logging
 import platform
 import gc
+import json
 from PySide6 import QtCore, QtWidgets, QtGui
 from discord import Discord
 import data
@@ -12,6 +13,7 @@ from scanner import GameScanner
 from runner_view import RunnerView
 from mods_view import ModsView
 from launcher import GameLauncher
+from import_view import ModsImport
 from theme import Theme
 
 class MainWindow(QtWidgets.QMainWindow):
@@ -64,6 +66,7 @@ class MainWindow(QtWidgets.QMainWindow):
         menu.addAction("Add &Runners", self.showRunnerList)
         menu.addAction("Add &Games", self.gameScanner)
         menu.addAction("Add &Modpack", self.showModWindow)
+        menu.addAction("&Import Modpack", self.importModpack)
         menu.addAction("&Exit", self.close)
 
         fileToolbar = self.addToolBar("Toolbar")
@@ -252,6 +255,21 @@ class MainWindow(QtWidgets.QMainWindow):
         self.runnerList = None
         gc.collect()
 
+    def importModpack(self):
+        """Choose json file, open importer window"""
+        self.status.showMessage("Selecting a modpack to import...")
+        chooser = QtWidgets.QFileDialog(self)
+        chooser.setFileMode(QtWidgets.QFileDialog.ExistingFiles)
+        chooser.setNameFilter("Modpack JSON (*.json)")
+        if chooser.exec():
+            pack_file = chooser.selectedFiles()[0]
+            with open(pack_file, encoding="utf-8") as jsonFile:
+                jsonData = json.load(jsonFile)
+                importView = ModsImport(self, jsonData)
+                importView.showWindow()
+        self.status.showMessage("Idle...")
+
+
     def dragEnterEvent(self, event):
         """Filters things dragged into window"""
         if event.mimeData().hasUrls():
@@ -270,7 +288,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def clearStatus(self):
         """Changes status after game closes"""
-        self.discordState = "Idle"
+        self.discordState = "Idle..."
         self.discordDetails = "Looking at games"
         self.game_running = False
         self.status.showMessage("Idle...")
