@@ -1,7 +1,6 @@
 """Import mod packs"""
 import sys
 import logging
-import json
 import webbrowser
 import platform
 from PySide6 import QtCore, QtWidgets, QtGui
@@ -45,10 +44,8 @@ class ModsImport(QtWidgets.QMainWindow):
         modInfo.addWidget(QtWidgets.QLabel(f"Base: {self.base}"), 0, 1)
         self.mods = {}
         for e in mods:
-            self.modList.addItem(e["name"])
+            self.modList.addItem("❌"+e["name"])
             self.mods[e["name"]] = { "source": e["source"], "found": False, "path": None}
-        print(json.dumps(data, indent=4))
-
         self.downloadButton = QtWidgets.QPushButton("Download", self)
         self.browseButton = QtWidgets.QPushButton("Browse", self)
         self.finishButton = QtWidgets.QPushButton("Finish", self)
@@ -82,6 +79,7 @@ class ModsImport(QtWidgets.QMainWindow):
         """placeholder"""
         files = [u.toLocalFile() for u in event.mimeData().urls()]
         for path in files:
+            self.logger.debug(f"Adding dropped file: {path}")
             self.addDroppedModFile(path)
         return super().dropEvent(event)
 
@@ -94,13 +92,16 @@ class ModsImport(QtWidgets.QMainWindow):
         """Add mod file to list"""
         fileName = file.split("/")[-1]
         for i in range(self.modList.count()):
-            text = self.modList.item(i).text()
+            if "❌" in self.modList.item(i).text():
+                text = self.modList.item(i).text().split("❌")[-1]
+            else:
+                text = self.modList.item(i).text().split("✔")[-1]
             if text == fileName:
                 if not self.mods[text]["found"]:
                     self.loadedCount+=1
                 self.mods[text]["found"] = True
                 self.mods[text]["path"] = file
-                print(self.mods[text])
+                self.modList.item(i).setText("✔"+text)
                 self.updateStatus()
                 break
 
@@ -109,14 +110,17 @@ class ModsImport(QtWidgets.QMainWindow):
         chooser = QtWidgets.QFileDialog(self)
         chooser.setFileMode(QtWidgets.QFileDialog.ExistingFiles)
         currentItem = self.modList.currentItem()
-        currentText = currentItem.text()
+        if "❌" in currentItem.text():
+            currentText = currentItem.text().split("❌")[-1]
+        else:
+            currentText = currentItem.text().split("✔")[-1]
         if chooser.exec():
             modFile = chooser.selectedFiles()[0]
             self.mods[currentText]["path"] = modFile
             if not self.mods[currentText]["found"]:
                 self.loadedCount+=1
             self.mods[currentText]["found"] = True
-            print(self.mods[currentText])
+            currentItem.setText("✔"+currentText)
             self.updateStatus()
 
     def updateStatus(self):
@@ -127,8 +131,11 @@ class ModsImport(QtWidgets.QMainWindow):
 
     def selectedModChanged(self, currentRow):
         """Updates vars on change"""
-        print(currentRow)
         currentItem = self.modList.item(currentRow).text()
+        if "❌" in currentItem:
+            currentItem = currentItem.split("❌")[-1]
+        else:
+            currentItem = currentItem.split("✔")[-1]
         self.browseButton.setDisabled(False)
         if len(self.mods[currentItem]["source"]) > 0:
             self.downloadButton.setDisabled(False)
@@ -143,6 +150,7 @@ class ModsImport(QtWidgets.QMainWindow):
 
     def saveModpack(self):
         """Saves modpack to registry and closes window"""
+        self.logger.info(f"Saving modpack \"{self.name}\" for \"{self.base}\"")
         self.settings.beginGroup(f"Modpacks/{self.name}")
         self.settings.setValue("base", self.base)
         self.settings.beginWriteArray("files")
@@ -154,6 +162,7 @@ class ModsImport(QtWidgets.QMainWindow):
             self.settings.setValue("source",self.mods[names[i]]["source"])
         self.settings.endArray()
         self.settings.endGroup()
+        self.parent().gameList.refresh()
         self.close()
 
     def showWindow(self):
