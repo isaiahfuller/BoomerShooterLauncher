@@ -15,7 +15,6 @@ class ModsImport(QtWidgets.QMainWindow):
         self.logger = logging.getLogger("Modpack Importer")
         if "--debug" in sys.argv:
             self.logger.setLevel(logging.DEBUG)
-            self.logger.debug("Debug mode")
         self.logger.info(f"{data}")
         match platform.system():
             case "Windows":
@@ -76,10 +75,10 @@ class ModsImport(QtWidgets.QMainWindow):
             event.ignore()
 
     def dropEvent(self, event):
-        """placeholder"""
+        """Matches selected files by filename"""
         files = [u.toLocalFile() for u in event.mimeData().urls()]
         for path in files:
-            self.logger.debug(f"Adding dropped file: {path}")
+            self.logger.info(f"Adding dropped file: {path}")
             self.addDroppedModFile(path)
         return super().dropEvent(event)
 
@@ -101,6 +100,7 @@ class ModsImport(QtWidgets.QMainWindow):
                     self.loadedCount+=1
                 self.mods[text]["found"] = True
                 self.mods[text]["path"] = file
+                self.logger.debug(f"Setting {text} Path: {self.mods[text]['path']}")
                 self.modList.item(i).setText("✔"+text)
                 self.updateStatus()
                 break
@@ -151,6 +151,7 @@ class ModsImport(QtWidgets.QMainWindow):
         else:
             currentText = currentItem.split("✔")[-1]
         url = self.mods[currentText]["source"]
+        self.logger.info(f"Opening broswer to: {url}")
         webbrowser.open(url)
 
     def saveModpack(self):
