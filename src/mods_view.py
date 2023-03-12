@@ -2,6 +2,7 @@
 import os
 import platform
 import logging
+import json
 from PySide6 import QtCore, QtWidgets, QtGui
 
 
@@ -80,20 +81,22 @@ class ModsView(QtWidgets.QMainWindow):
         self.pathLabel.setWordWrap(True)
 
         modInfoGrid.setAlignment(QtCore.Qt.AlignTop)
-        modInfoGrid.addWidget(QtWidgets.QLabel("Name: "), 0, 0)
-        modInfoGrid.addWidget(QtWidgets.QLabel("Source: "), 1, 0)
-        modInfoGrid.addWidget(QtWidgets.QLabel("Path: "), 2, 0)
+        # modInfoGrid.addWidget(QtWidgets.QLabel("Name: "), 0, 0)
+        modInfoGrid.addWidget(QtWidgets.QLabel("Source: "), 0, 0)
+        modInfoGrid.addWidget(QtWidgets.QLabel("Path: "), 1, 0)
 
-        self.modNameEdit = QtWidgets.QLineEdit()
+        # self.modNameEdit = QtWidgets.QLineEdit()
         self.modSourceEdit = QtWidgets.QLineEdit()
         self.modSourceEdit.setStyleSheet("min-width: 150px;")
-        modInfoGrid.addWidget(self.modNameEdit, 0, 1)
-        modInfoGrid.addWidget(self.modSourceEdit, 1, 1)
-        modInfoGrid.addWidget(self.pathLabel, 2, 1)
+        # modInfoGrid.addWidget(self.modNameEdit, 0, 1)
+        modInfoGrid.addWidget(self.modSourceEdit, 0, 1)
+        modInfoGrid.addWidget(self.pathLabel, 1, 1)
 
+        exportPackButton = QtWidgets.QPushButton("Export", self)
         addFileButton = QtWidgets.QPushButton("Add", self)
         removeFileButton = QtWidgets.QPushButton("Remove", self)
         saveButton = QtWidgets.QPushButton("Save", self)
+        footer.addWidget(exportPackButton)
         footer.addWidget(addFileButton)
         footer.addWidget(removeFileButton)
         footer.addWidget(saveButton)
@@ -116,8 +119,9 @@ class ModsView(QtWidgets.QMainWindow):
         self.downButton.clicked.connect(self.moveDown)
         saveButton.clicked.connect(self.saveFile)
         self.nameEdit.textEdited.connect(self.changeName)
-        self.modNameEdit.textEdited.connect(self.changeModName)
+        # self.modNameEdit.textEdited.connect(self.changeModName)
         self.modSourceEdit.textEdited.connect(self.changeModSource)
+        exportPackButton.clicked.connect(self.exportJson)
 
         self.selected = None
 
@@ -140,10 +144,10 @@ class ModsView(QtWidgets.QMainWindow):
         """Adds mod to mod pack"""
         fileSplit = filePath.split("/")
         fileName = fileSplit[len(fileSplit) - 1]
-        nameSplit = fileName.split(".")
-        nameSplit[len(nameSplit) - 1] = ""
-        modName = ".".join(nameSplit)
-        modName = modName[0:len(modName) - 1]
+        modName = fileName
+        # nameSplit = fileName.split(".")
+        # nameSplit[len(nameSplit) - 1] = ""
+        # modName = ".".join(nameSplit)
         found = False
         for i in self.mods["files"]:
             if i["path"] == filePath:
@@ -152,7 +156,7 @@ class ModsView(QtWidgets.QMainWindow):
         if not found:
             self.mods["files"].append(
                 {"name": modName, "path": filePath, "source": ""})
-            self.modNameEdit.setText(modName)
+            # self.modNameEdit.setText(modName)
             self.pathLabel.setText(filePath)
             self.modList.addItem(fileName)
 
@@ -175,7 +179,7 @@ class ModsView(QtWidgets.QMainWindow):
 
     def selectedModChanged(self, currentRow):
         """Updates vars on change"""
-        self.modNameEdit.setText(self.mods["files"][currentRow]["name"])
+        # self.modNameEdit.setText(self.mods["files"][currentRow]["name"])
         self.modSourceEdit.setText(self.mods["files"][currentRow]["source"])
         self.pathLabel.setText(self.mods["files"][currentRow]["path"])
         self.selected = currentRow
@@ -237,11 +241,14 @@ class ModsView(QtWidgets.QMainWindow):
             self.close()
 
     def changeName(self, text):
-        """Change name of mod file"""
+        """Change name of mod pack"""
+        name = self.mods["name"]
+        self.settings.remove(f"Modpacks/{name}")
+        self.logger.info("Removing %s", name)
         self.mods["name"] = text
 
     def changeModName(self, text):
-        """Change name of mod pack"""
+        """Change name of mod file"""
         self.mods["files"][self.selected]["name"] = text
 
     def changeModSource(self, text):
@@ -260,6 +267,7 @@ class ModsView(QtWidgets.QMainWindow):
     def closeEvent(self, event: QtGui.QCloseEvent) -> None:
         """Refreshes game list while closing modpack menu"""
         self.gameList.refresh()
+        self.deleteLater()
         return super().closeEvent(event)
 
     def openFile(self):
@@ -282,7 +290,7 @@ class ModsView(QtWidgets.QMainWindow):
                     "source": self.settings.value("source")
                 })
         self.settings.endArray()
-        self.modNameEdit.setText(self.settings.value("files/1/name"))
+        # self.modNameEdit.setText(self.settings.value("files/1/name"))
         self.pathLabel.setText(self.settings.value("files/1/path"))
         self.modSourceEdit.setText(self.settings.value("files/1/source"))
         self.settings.endGroup()
@@ -291,6 +299,24 @@ class ModsView(QtWidgets.QMainWindow):
     def rmFile(self):
         """Removes mod pack"""
         name = self.gameList.selectedItems()[1].text()
-        self.settings.remove("Modpacks/%s", name)
+        self.settings.remove(f"Modpacks/{name}")
         self.logger.info("Removing %s", name)
         self.gameList.refresh()
+
+    def exportJson(self):
+        """Save current modpack to json file"""
+        save_to = QtWidgets.QFileDialog().getSaveFileName(self, "Save To...",
+            filter="JSON (*.json)")
+        self.logger.info("Saving JSON to: %s", save_to[0])
+        if not save_to[0]:
+            return
+        data = {
+            "name": self.mods["name"],
+            "base": self.mods["base"],
+        }
+        mods = self.mods["files"]
+        for mod in mods:
+            mod.pop("path", None)
+        data["mods"] = mods
+        with open(save_to[0], "w", encoding="utf-8") as outfile:
+            outfile.write(json.dumps(data, indent=4))

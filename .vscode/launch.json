@@ -13,7 +13,16 @@
       "cwd": "${workspaceFolder}/src",
       "env": {
         "PYTHONPATH": "${workspaceFolder}"
-      }
+      },
+      "args": ["--debug"]
+    },
+    {
+      "name": "Python: Current File",
+      "type": "python",
+      "request": "launch",
+      "program": "${file}",
+      "console": "integratedTerminal",
+      "justMyCode": true,
     }
   ]
 }

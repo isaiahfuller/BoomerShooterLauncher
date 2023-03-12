@@ -12,6 +12,7 @@ class GamesView(QtWidgets.QTableWidget):
 
     def __init__(self, parent):
         super().__init__(parent=parent)
+        self.status = parent.status
         self.logger = logging.getLogger("Game List")
         self.logger.debug("Building game list")
         match platform.system():

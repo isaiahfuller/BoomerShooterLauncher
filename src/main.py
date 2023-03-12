@@ -3,6 +3,7 @@ import sys
 import os
 import logging
 import platform
+import json
 from PySide6 import QtCore, QtWidgets, QtGui
 from discord import Discord
 import data
@@ -11,16 +12,21 @@ from scanner import GameScanner
 from runner_view import RunnerView
 from mods_view import ModsView
 from launcher import GameLauncher
+from import_view import ModsImport
+from theme import Theme
 
 class MainWindow(QtWidgets.QMainWindow):
     """Main launcher window"""
     def __init__(self):
         super().__init__()
+        self.status = self.statusBar()
         self.logger = logging.getLogger("Main window")
         if "--debug" in sys.argv:
             self.logger.setLevel(logging.DEBUG)
             self.logger.debug("Debug mode")
         self.platform = platform.system()
+
+        self.theme = Theme(app.setStyleSheet)
 
         match self.platform:
             case "Windows":
@@ -31,16 +37,14 @@ class MainWindow(QtWidgets.QMainWindow):
         self.readSettings()
         self.discord = Discord()
 
-        self.runnerList = RunnerView(self)
         self.gameList = GamesView(self)
-        self.process = GameLauncher(self)
+        self.process = None
         self.game = None
         self.discordTimer = QtCore.QTimer()
         self.discordDetails = ""
         self.discordState = ""
         self.currentRunners = []
         self.currentVersions = []
-        self.mod_list = None
         self.runnerText = ""
         self.game_running = False
         self.originalPath = ""
@@ -53,11 +57,20 @@ class MainWindow(QtWidgets.QMainWindow):
         scroll.setWidgetResizable(True)
         scroll.setWidget(self.gameList)
 
+        menuBar = self.menuBar()
+        menu = QtWidgets.QMenu("&File", parent=menuBar)
+        menuBar.addMenu(menu)
+        menu.addAction("Add &Runners", self.showRunnerList)
+        menu.addAction("Add &Games", self.gameScanner)
+        menu.addAction("Add &Modpack", self.showModWindow)
+        menu.addAction("&Import Modpack", self.importModpack)
+        menu.addAction("&Exit", self.close)
+
         fileToolbar = self.addToolBar("Toolbar")
         self.runnerToolbar = self.addToolBar("Launcher")
         fileToolbar.setMovable(False)
 
-        fileToolbar.addAction("&Add Runners", self.runnerList.showWindowFromMenu)
+        fileToolbar.addAction("&Add Runners", self.showRunnerList)
         fileToolbar.addAction("&Add Games", self.gameScanner)
         fileToolbar.addAction("&Add Modpack", self.showModWindow)
         if self.logger.level == logging.DEBUG:
@@ -86,11 +99,9 @@ class MainWindow(QtWidgets.QMainWindow):
         self.gameList.cellActivated.connect(self.launchGame)
 
         self.discordTimer.start(30 * 1000)
-        self.discordTimer.timeout.connect(self.updateDiscordStatus)
-        self.process.finished.connect(self.clearDiscordStatus)
-        self.process.finished.connect(self.gameClosed)
-        self.clearDiscordStatus()
-        self.updateDiscordStatus()
+        self.discordTimer.timeout.connect(self.updateStatus)
+        self.clearStatus()
+        self.updateStatus()
 
         self.setCentralWidget(scroll)
         self.setAcceptDrops(True)
@@ -113,10 +124,14 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def gameScanner(self):
         """Scans files"""
+        self.status.showMessage("Scanning games...")
         scanner = GameScanner(self)
         if scanner.exec():
             files = scanner.selectedFiles()
             scanner.directoryCrawl(files[0], self.gameList.refresh)
+        self.clearStatus()
+        self.gameList.refresh()
+        scanner = None
 
     def getRunners(self):
         """Add all compatible source ports to combobox"""
@@ -183,8 +198,12 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def launchGame(self):
         """Launch currently selected game with currently selected source port"""
+        runnerList = RunnerView(self)
         version_text = self.versionCombobox.currentText()
         self.runnerText = self.runnerCombobox.currentText()
+        self.process = GameLauncher(self)
+        self.process.finished.connect(self.clearStatus)
+        self.process.finished.connect(self.gameClosed)
         if "(Modded)" not in self.gameList.selectedItems()[0].text():
             game = self.gameList.selectedItems()[1].text()
             self.settings.beginGroup(f"Games/{game}/{version_text}")
@@ -197,7 +216,7 @@ class MainWindow(QtWidgets.QMainWindow):
         try:
             game = self.settings.value("path")
             if len(self.currentRunners) == 0:
-                self.runnerList.showWindow(self.game)
+                runnerList.showWindow(self.game)
             else:
                 self.originalPath = os.getcwd()
                 if "(Modded)" in self.gameList.selectedItems()[0].text():
@@ -207,17 +226,42 @@ class MainWindow(QtWidgets.QMainWindow):
                 self.discordDetails = f"Playing {self.gameList.game} with {self.runnerText}"
                 self.discordState = version_text
                 self.game_running = True
-                self.updateDiscordStatus()
+                self.updateStatus()
+                self.status.showMessage(f"{self.discordDetails} ({version_text})")
         except Exception as e: # pylint: disable=broad-except
             self.logger.exception(e)
             self.logger.error("Failed to launch game")
+            errorWindow = QtWidgets.QErrorMessage(self)
+            errorWindow.showMessage(f"Failed to launch game ({e})")
         finally:
             self.settings.endGroup()
+            self.process = None
+            runnerList = None
 
     def showModWindow(self):
         """Creates and displays the mod editor window"""
-        self.mod_list = ModsView(self.gameList)
-        self.mod_list.showWindow()
+        mod_list = ModsView(self.gameList)
+        mod_list.showWindow()
+
+    def showRunnerList(self):
+        """Creates and displays the runner window"""
+        runnerList = RunnerView(self)
+        runnerList.showWindowFromMenu()
+
+    def importModpack(self):
+        """Choose json file, open importer window"""
+        self.status.showMessage("Selecting a modpack to import...")
+        chooser = QtWidgets.QFileDialog(self)
+        chooser.setFileMode(QtWidgets.QFileDialog.ExistingFiles)
+        chooser.setNameFilter("Modpack JSON (*.json)")
+        if chooser.exec():
+            pack_file = chooser.selectedFiles()[0]
+            with open(pack_file, encoding="utf-8") as jsonFile:
+                jsonData = json.load(jsonFile)
+                importView = ModsImport(self, jsonData)
+                importView.showWindow()
+        self.status.showMessage("Idle...")
+
 
     def dragEnterEvent(self, event):
         """Filters things dragged into window"""
@@ -232,26 +276,29 @@ class MainWindow(QtWidgets.QMainWindow):
         files = [u.toLocalFile() for u in event.mimeData().urls()]
         for path in files:
             scanner.directoryCrawl(path, self.gameList.refresh)
+            self.gameList.refresh()
         return super().dropEvent(event)
 
-    def clearDiscordStatus(self):
-        """Changes discord status after game closes"""
-        self.discordState = "Idle"
+    def clearStatus(self):
+        """Changes status after game closes"""
+        self.discordState = "Idle..."
         self.discordDetails = "Looking at games"
         self.game_running = False
-        self.updateDiscordStatus()
+        self.status.showMessage("Idle...")
+        self.updateStatus()
 
-    def updateDiscordStatus(self):
-        """Updates Discord status"""
+    def updateStatus(self):
+        """Updates status"""
         self.discord.update(self.discordState, self.discordDetails)
 
     def gameClosed(self):
         """Changes working directory after game closes"""
         os.chdir(self.originalPath)
 
-    def closeEvent(self, event: QtGui.QCloseEvent) -> None:
+    def closeEvent(self, event: QtGui.QCloseEvent):
         """Saves settings before closing"""
         self.writeSettings()
+        self.discord.clear()
         return super().closeEvent(event)
 
 if __name__ == "__main__":
