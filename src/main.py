@@ -3,7 +3,6 @@ import sys
 import os
 import logging
 import platform
-import gc
 import json
 from PySide6 import QtCore, QtWidgets, QtGui
 from discord import Discord
@@ -39,7 +38,6 @@ class MainWindow(QtWidgets.QMainWindow):
         self.discord = Discord()
 
         self.gameList = GamesView(self)
-        self.runnerList = None
         self.process = None
         self.game = None
         self.discordTimer = QtCore.QTimer()
@@ -47,7 +45,6 @@ class MainWindow(QtWidgets.QMainWindow):
         self.discordState = ""
         self.currentRunners = []
         self.currentVersions = []
-        self.mod_list = None
         self.runnerText = ""
         self.game_running = False
         self.originalPath = ""
@@ -201,8 +198,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def launchGame(self):
         """Launch currently selected game with currently selected source port"""
-        if self.runnerList is None:
-            self.runnerList = RunnerView(self)
+        runnerList = RunnerView(self)
         version_text = self.versionCombobox.currentText()
         self.runnerText = self.runnerCombobox.currentText()
         self.process = GameLauncher(self)
@@ -220,7 +216,7 @@ class MainWindow(QtWidgets.QMainWindow):
         try:
             game = self.settings.value("path")
             if len(self.currentRunners) == 0:
-                self.runnerList.showWindow(self.game)
+                runnerList.showWindow(self.game)
             else:
                 self.originalPath = os.getcwd()
                 if "(Modded)" in self.gameList.selectedItems()[0].text():
@@ -240,20 +236,17 @@ class MainWindow(QtWidgets.QMainWindow):
         finally:
             self.settings.endGroup()
             self.process = None
-            self.runnerList = None
+            runnerList = None
 
     def showModWindow(self):
         """Creates and displays the mod editor window"""
-        self.mod_list = ModsView(self.gameList)
-        self.mod_list.showWindow()
-        self.mod_list = None
+        mod_list = ModsView(self.gameList)
+        mod_list.showWindow()
 
     def showRunnerList(self):
         """Creates and displays the runner window"""
-        self.runnerList = RunnerView(self)
-        self.runnerList.showWindowFromMenu()
-        self.runnerList = None
-        gc.collect()
+        runnerList = RunnerView(self)
+        runnerList.showWindowFromMenu()
 
     def importModpack(self):
         """Choose json file, open importer window"""
@@ -302,7 +295,7 @@ class MainWindow(QtWidgets.QMainWindow):
         """Changes working directory after game closes"""
         os.chdir(self.originalPath)
 
-    def closeEvent(self, event: QtGui.QCloseEvent) -> None:
+    def closeEvent(self, event: QtGui.QCloseEvent):
         """Saves settings before closing"""
         self.writeSettings()
         self.discord.clear()

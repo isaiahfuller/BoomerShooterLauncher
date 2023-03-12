@@ -3,18 +3,28 @@ import sys
 import logging
 import json
 import webbrowser
+import platform
 from PySide6 import QtCore, QtWidgets, QtGui
 
 class ModsImport(QtWidgets.QMainWindow):
     """Modpack importer"""
     def __init__(self, parent, data):
-        super().__init__(parent)
+        super().__init__(parent=parent)
+        parent = self.parent()
+        self.setWindowModality(QtCore.Qt.ApplicationModal)
         self.status = self.statusBar()
         self.logger = logging.getLogger("Modpack Importer")
         if "--debug" in sys.argv:
             self.logger.setLevel(logging.DEBUG)
             self.logger.debug("Debug mode")
         self.logger.info(f"{data}")
+        match platform.system():
+            case "Windows":
+                self.settings = QtCore.QSettings(
+                    "fullerSpectrum", "Boomer Shooter Launcher")
+            case "Linux":
+                self.settings = QtCore.QSettings(
+                    "boomershooterlauncher", "config")
 
         mainLayout = QtWidgets.QVBoxLayout()
         self.modList = QtWidgets.QListWidget()
@@ -26,13 +36,13 @@ class ModsImport(QtWidgets.QMainWindow):
 
         mainLayout.addLayout(modInfo)
         mainLayout.addWidget(self.modList)
-        name = data["name"]
-        base = data["base"]
+        self.name = data["name"]
+        self.base = data["base"]
         mods = data["mods"]
         self.loadedCount = 0
         modInfo.setAlignment(QtCore.Qt.AlignTop)
-        modInfo.addWidget(QtWidgets.QLabel(f"Name: {name}"), 0, 0)
-        modInfo.addWidget(QtWidgets.QLabel(f"Base: {base}"), 0, 1)
+        modInfo.addWidget(QtWidgets.QLabel(f"Name: {self.name}"), 0, 0)
+        modInfo.addWidget(QtWidgets.QLabel(f"Base: {self.base}"), 0, 1)
         self.mods = {}
         for e in mods:
             self.modList.addItem(e["name"])
@@ -54,6 +64,7 @@ class ModsImport(QtWidgets.QMainWindow):
 
         self.browseButton.clicked.connect(self.addModFile)
         self.downloadButton.clicked.connect(self.downloadMod)
+        self.finishButton.clicked.connect(self.saveModpack)
         self.modList.currentRowChanged.connect(self.selectedModChanged)
 
         self.setCentralWidget(scroll)
@@ -129,6 +140,21 @@ class ModsImport(QtWidgets.QMainWindow):
         currentItem = self.modList.currentItem().text()
         url = self.mods[currentItem]["source"]
         webbrowser.open(url)
+
+    def saveModpack(self):
+        """Saves modpack to registry and closes window"""
+        self.settings.beginGroup(f"Modpacks/{self.name}")
+        self.settings.setValue("base", self.base)
+        self.settings.beginWriteArray("files")
+        names = list(self.mods.keys())
+        for i in range(0,len(self.mods)):
+            self.settings.setArrayIndex(i)
+            self.settings.setValue("name", names[i])
+            self.settings.setValue("path",self.mods[names[i]]["path"])
+            self.settings.setValue("source",self.mods[names[i]]["source"])
+        self.settings.endArray()
+        self.settings.endGroup()
+        self.close()
 
     def showWindow(self):
         """Open window and set size/location"""
