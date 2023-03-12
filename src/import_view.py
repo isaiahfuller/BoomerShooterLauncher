@@ -114,6 +114,7 @@ class ModsImport(QtWidgets.QMainWindow):
             currentText = currentItem.text().split("❌")[-1]
         else:
             currentText = currentItem.text().split("✔")[-1]
+        chooser.setNameFilter(f"{currentText} (*).{currentText.split('.')[-1]}")
         if chooser.exec():
             modFile = chooser.selectedFiles()[0]
             self.mods[currentText]["path"] = modFile
@@ -145,7 +146,11 @@ class ModsImport(QtWidgets.QMainWindow):
     def downloadMod(self):
         """Opens download page in default web browser"""
         currentItem = self.modList.currentItem().text()
-        url = self.mods[currentItem]["source"]
+        if "❌" in currentItem:
+            currentText = currentItem.split("❌")[-1]
+        else:
+            currentText = currentItem.split("✔")[-1]
+        url = self.mods[currentText]["source"]
         webbrowser.open(url)
 
     def saveModpack(self):
