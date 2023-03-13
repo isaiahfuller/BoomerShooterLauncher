@@ -258,7 +258,7 @@ class ModsView(QtWidgets.QMainWindow):
     def showWindow(self):
         """Displays the window"""
         self.setFixedSize(500, 500)
-        mainLocation = self.parent().parent().parent().parent().frameGeometry()
+        mainLocation = self.parent().parent().frameGeometry()
         x = mainLocation.x() + mainLocation.width() / 2 - self.width() / 2
         y = mainLocation.y() + mainLocation.height() / 2 - self.height() / 2
         self.move(x, y)

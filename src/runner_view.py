@@ -14,7 +14,7 @@ class RunnerView(QtWidgets.QMainWindow):
         super().__init__(parent=parent)
         self.setWindowModality(QtCore.Qt.ApplicationModal)
         self.logger = logging.getLogger("Runner Editor")
-
+        self.logger.info("Opened")
         match platform.system():
             case "Windows":
                 self.settings = QtCore.QSettings("fullerSpectrum", "Boomer Shooter Launcher")

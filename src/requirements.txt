@@ -12,3 +12,4 @@ platform
 logging
 pyqtdarktheme
 zlib
+qtawesome

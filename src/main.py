@@ -5,6 +5,7 @@ import logging
 import platform
 import json
 from PySide6 import QtCore, QtWidgets, QtGui
+import qtawesome as qta
 from discord import Discord
 import data
 from games_view import GamesView
@@ -15,8 +16,10 @@ from launcher import GameLauncher
 from import_view import ModsImport
 from theme import Theme
 
+
 class MainWindow(QtWidgets.QMainWindow):
     """Main launcher window"""
+
     def __init__(self):
         super().__init__()
         self.status = self.statusBar()
@@ -30,9 +33,11 @@ class MainWindow(QtWidgets.QMainWindow):
 
         match self.platform:
             case "Windows":
-                self.settings = QtCore.QSettings("fullerSpectrum", "Boomer Shooter Launcher")
+                self.settings = QtCore.QSettings(
+                    "fullerSpectrum", "Boomer Shooter Launcher")
             case "Linux":
-                self.settings = QtCore.QSettings("boomershooterlauncher", "config")
+                self.settings = QtCore.QSettings(
+                    "boomershooterlauncher", "config")
 
         self.readSettings()
         self.discord = Discord()
@@ -49,40 +54,38 @@ class MainWindow(QtWidgets.QMainWindow):
         self.game_running = False
         self.originalPath = ""
 
-        self.gameList.setHorizontalHeaderLabels(["","Name","Files"])
+        iconColor = "grey"
+        plusIcon = qta.icon('fa5s.plus', color=iconColor)
+        codeIcon = qta.icon('fa5s.code', color=iconColor)
+        listIcon = qta.icon('fa5s.list-ol', color=iconColor)
+        loadIcon = qta.icon('fa5s.file-download', color=iconColor)
+        refreshIcon = qta.icon('fa5s.sync-alt', color=iconColor)
 
-        scroll = QtWidgets.QScrollArea()
-        scroll.setHorizontalScrollBarPolicy(
-            QtCore.Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        scroll.setWidgetResizable(True)
-        scroll.setWidget(self.gameList)
-
-        menuBar = self.menuBar()
-        menu = QtWidgets.QMenu("&File", parent=menuBar)
-        menuBar.addMenu(menu)
-        menu.addAction("Add &Runners", self.showRunnerList)
-        menu.addAction("Add &Games", self.gameScanner)
-        menu.addAction("Add &Modpack", self.showModWindow)
-        menu.addAction("&Import Modpack", self.importModpack)
-        menu.addAction("&Exit", self.close)
+        self.gameList.setHorizontalHeaderLabels(["", "Name", "Files"])
 
         fileToolbar = self.addToolBar("Toolbar")
+        self.addToolBarBreak()
         self.runnerToolbar = self.addToolBar("Launcher")
         fileToolbar.setMovable(False)
 
-        fileToolbar.addAction("&Add Runners", self.showRunnerList)
-        fileToolbar.addAction("&Add Games", self.gameScanner)
-        fileToolbar.addAction("&Add Modpack", self.showModWindow)
+        fileToolbar.addAction(codeIcon, "&Manage Ports", self.showRunnerList)
+        fileToolbar.addAction(plusIcon, "&Add Games", self.gameScanner)
+        fileToolbar.addAction(listIcon, "&New Modpack", self.showModWindow)
+        fileToolbar.addAction(loadIcon, "&Import Modpack", self.importModpack)
+
+        fileToolbar.setToolButtonStyle(QtCore.Qt.ToolButtonTextUnderIcon)
         if self.logger.level == logging.DEBUG:
-            fileToolbar.addAction("&Refresh", self.gameList.refresh)
+            fileToolbar.addAction(refreshIcon, "&Refresh", self.gameList.refresh)
 
         self.runnerCombobox = QtWidgets.QComboBox()
         self.runnerCombobox.addItem("Select a game first")
         self.versionCombobox = QtWidgets.QComboBox()
         self.versionCombobox.addItem("Versions")
         self.launchButton = QtWidgets.QPushButton("Launch", self)
-        self.runnerCombobox.setSizeAdjustPolicy(QtWidgets.QComboBox.AdjustToContents)
-        self.versionCombobox.setSizeAdjustPolicy(QtWidgets.QComboBox.AdjustToContents)
+        self.runnerCombobox.setSizeAdjustPolicy(
+            QtWidgets.QComboBox.AdjustToContents)
+        self.versionCombobox.setSizeAdjustPolicy(
+            QtWidgets.QComboBox.AdjustToContents)
         self.runnerCombobox.setEnabled(False)
         self.versionCombobox.setEnabled(False)
 
@@ -103,7 +106,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.clearStatus()
         self.updateStatus()
 
-        self.setCentralWidget(scroll)
+        self.setCentralWidget(self.gameList)
         self.setAcceptDrops(True)
 
     def writeSettings(self):
@@ -138,19 +141,21 @@ class MainWindow(QtWidgets.QMainWindow):
         self.currentRunners.clear()
         self.runnerCombobox.clear()
         if self.gameList.selectedIndexes():
-            game = self.gameList.selectedItems()[0].text().replace(" (Modded)","")
+            game = self.gameList.selectedItems(
+            )[0].text().replace(" (Modded)", "")
 
             self.game = game
             self.settings.beginGroup("Runners")
             res = self.settings.childGroups()
             self.settings.endGroup()
             for x in res:
-                for y in data.runners: # pylint: disable=consider-using-dict-items
+                for y in data.runners:  # pylint: disable=consider-using-dict-items
                     if game in data.runners[y]["games"] and x in y:
                         self.currentRunners.append(x)
                 if x not in data.runners:
                     self.currentRunners.append(x)
-            self.logger.debug(f"Compatible runners for \"{game}\": {self.currentRunners}")
+            self.logger.debug(
+                f"Compatible runners for \"{game}\": {self.currentRunners}")
             if len(self.currentRunners) == 0:
                 self.runnerCombobox.adjustSize()
                 self.runnerCombobox.setEnabled(False)
@@ -173,7 +178,8 @@ class MainWindow(QtWidgets.QMainWindow):
             bases = self.settings.childGroups()
             res = []
             if "(Modded)" in self.gameList.selectedItems()[0].text():
-                game = self.gameList.selectedItems()[0].text().replace(" (Modded)", "")
+                game = self.gameList.selectedItems(
+                )[0].text().replace(" (Modded)", "")
                 for i in bases:
                     if self.settings.value(f"{i}/game") == game:
                         self.settings.beginGroup(i)
@@ -211,7 +217,7 @@ class MainWindow(QtWidgets.QMainWindow):
             keys = self.settings.allKeys()
             for i in keys:
                 if f"/{version_text}/crc" in i:
-                    game = i.replace("/crc","")
+                    game = i.replace("/crc", "")
                     self.settings.beginGroup(game)
         try:
             game = self.settings.value("path")
@@ -220,15 +226,17 @@ class MainWindow(QtWidgets.QMainWindow):
             else:
                 self.originalPath = os.getcwd()
                 if "(Modded)" in self.gameList.selectedItems()[0].text():
-                    self.process.runGame(self.game, game, self.runnerText, self.gameList.files)
+                    self.process.runGame(
+                        self.game, game, self.runnerText, self.gameList.files)
                 else:
                     self.process.runGame(self.game, game, self.runnerText, [])
                 self.discordDetails = f"Playing {self.gameList.game} with {self.runnerText}"
                 self.discordState = version_text
                 self.game_running = True
                 self.updateStatus()
-                self.status.showMessage(f"{self.discordDetails} ({version_text})")
-        except Exception as e: # pylint: disable=broad-except
+                self.status.showMessage(
+                    f"{self.discordDetails} ({version_text})")
+        except Exception as e:  # pylint: disable=broad-except
             self.logger.exception(e)
             self.logger.error("Failed to launch game")
             errorWindow = QtWidgets.QErrorMessage(self)
@@ -261,7 +269,6 @@ class MainWindow(QtWidgets.QMainWindow):
                 importView = ModsImport(self, jsonData)
                 importView.showWindow()
         self.status.showMessage("Idle...")
-
 
     def dragEnterEvent(self, event):
         """Filters things dragged into window"""
@@ -300,6 +307,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.writeSettings()
         self.discord.clear()
         return super().closeEvent(event)
+
 
 if __name__ == "__main__":
     app = QtWidgets.QApplication([])
