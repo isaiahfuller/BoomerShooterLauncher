@@ -19,7 +19,7 @@ class GameScanner(QtWidgets.QFileDialog):
         self.timer = None
         match platform.system():
             case "Windows":
-                self.settings = QtCore.QSettings("fullerSpectrum", "Boomer Shooter Launcher")
+                self.settings = QtCore.QSettings("Isaiah Fuller", "Boomer Shooter Launcher")
             case "Linux":
                 self.settings = QtCore.QSettings("boomershooterlauncher", "config")
         self.fileTypes = ("wad", "pk3", "ipk3")

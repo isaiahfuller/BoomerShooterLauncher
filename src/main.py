@@ -34,7 +34,7 @@ class MainWindow(QtWidgets.QMainWindow):
         match self.platform:
             case "Windows":
                 self.settings = QtCore.QSettings(
-                    "fullerSpectrum", "Boomer Shooter Launcher")
+                    "Isaiah Fuller", "Boomer Shooter Launcher")
             case "Linux":
                 self.settings = QtCore.QSettings(
                     "boomershooterlauncher", "config")

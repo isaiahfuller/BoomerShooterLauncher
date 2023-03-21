@@ -17,7 +17,7 @@ class RunnerView(QtWidgets.QMainWindow):
         self.logger.info("Opened")
         match platform.system():
             case "Windows":
-                self.settings = QtCore.QSettings("fullerSpectrum", "Boomer Shooter Launcher")
+                self.settings = QtCore.QSettings("Isaiah Fuller", "Boomer Shooter Launcher")
             case "Linux":
                 self.settings = QtCore.QSettings("boomershooterlauncher", "config")
 

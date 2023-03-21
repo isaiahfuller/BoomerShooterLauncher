@@ -20,7 +20,7 @@ class ModsImport(QtWidgets.QMainWindow):
         match platform.system():
             case "Windows":
                 self.settings = QtCore.QSettings(
-                    "fullerSpectrum", "Boomer Shooter Launcher")
+                    "Isaiah Fuller", "Boomer Shooter Launcher")
             case "Linux":
                 self.settings = QtCore.QSettings(
                     "boomershooterlauncher", "config")
@@ -55,7 +55,7 @@ class ModsImport(QtWidgets.QMainWindow):
         self.loadedCount = 0
         modInfo.setAlignment(QtCore.Qt.AlignTop)
         modInfo.addWidget(QtWidgets.QLabel(f"Name: {self.name}"), 0, 0)
-        modInfo.addWidget(QtWidgets.QLabel(f"Base: {self.base}"), 0, 1)
+        modInfo.addWidget(QtWidgets.QLabel(f"Base Game: {self.base}"), 1, 0)
         self.mods = {}
         count = 0
         greenCheck = qta.icon("fa5s.check", color="green")
