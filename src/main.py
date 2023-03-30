@@ -15,6 +15,7 @@ from mods_view import ModsView
 from launcher import GameLauncher
 from import_view import ModsImport
 from theme import Theme
+from first_run_view import FirstRun
 
 
 class MainWindow(QtWidgets.QMainWindow):
@@ -119,10 +120,16 @@ class MainWindow(QtWidgets.QMainWindow):
         """Read window geometry from registry"""
         self.settings.beginGroup("MainWindow")
         geometry = self.settings.value("geometry", QtCore.QByteArray())
+        firstRun = False
+        firstRun = True
         if geometry.isEmpty():
+            firstRun = True
             self.setGeometry(0, 0, 800, 600)
         else:
             self.restoreGeometry(geometry)
+        if firstRun:
+            self.logger.info("First run")
+            FirstRun(self).showWindow()
         self.settings.endGroup()
 
     def gameScanner(self):
