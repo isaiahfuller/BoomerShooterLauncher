@@ -209,16 +209,15 @@ class MainWindow(QtWidgets.QMainWindow):
                         self.settings.endGroup()
             else:
                 game = self.gameList.selectedItems()[1].text()
-                lastVersion = self.settings.value("Games/{game}/Last Version")
+                self.settings.beginGroup(game)
+                lastVersion = self.settings.value("Last Version")
                 if lastVersion:
                     self.versionCombobox.addItem(lastVersion)
-                self.settings.beginGroup(game)
                 res = self.settings.childGroups()
                 self.settings.endGroup()
             self.settings.endGroup()
             for x in res:
                 self.currentVersions.append(x)
-            # self.versionCombobox.addItems(self.currentVersions)
             for version in self.currentVersions:
                 if version != lastVersion:
                     self.versionCombobox.addItem(version)
@@ -249,10 +248,11 @@ class MainWindow(QtWidgets.QMainWindow):
             for i in keys:
                 if f"/{version_text}/crc" in i:
                     game = i.replace("/crc", "")
+                    gameName = self.gameList.selectedItems()[1].text()
                     self.settings.setValue(
-                        f"Modpacks/{self.gameList.selectedItems()[1].text()}/Last Runner", self.runnerText)
+                        f"Modpacks/{gameName}/Last Runner", self.runnerText)
                     self.settings.setValue(
-                        f"Modpacks/{self.gameList.selectedItems()[1].text()}/Last Version", version_text)
+                        f"Modpacks/{gameName}/Last Version", version_text)
                     self.settings.beginGroup(game)
         try:
             game = self.settings.value("path")
