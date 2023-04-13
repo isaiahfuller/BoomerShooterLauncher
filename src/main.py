@@ -76,7 +76,8 @@ class MainWindow(QtWidgets.QMainWindow):
 
         fileToolbar.setToolButtonStyle(QtCore.Qt.ToolButtonTextUnderIcon)
         if self.logger.level == logging.DEBUG:
-            fileToolbar.addAction(refreshIcon, "&Refresh", self.gameList.refresh)
+            fileToolbar.addAction(refreshIcon, "&Refresh",
+                                  self.gameList.refresh)
 
         self.runnerCombobox = QtWidgets.QComboBox()
         self.runnerCombobox.addItem("Select a game first")
@@ -154,7 +155,15 @@ class MainWindow(QtWidgets.QMainWindow):
             self.settings.beginGroup("Runners")
             res = self.settings.childGroups()
             self.settings.endGroup()
+            lastRunner = self.settings.value(f"Games/{game}/Last Runner")
+            if ("(Modded)" in self.gameList.selectedItems()[0].text()):
+                lastRunner = self.settings.value(
+                    f"Modpacks/{self.gameList.selectedItems()[1].text()}/Last Runner")
+            if lastRunner:
+                self.runnerCombobox.addItem(lastRunner)
             for x in res:
+                if x == lastRunner:
+                    continue
                 for y in data.runners:  # pylint: disable=consider-using-dict-items
                     if game in data.runners[y]["games"] and x in y:
                         self.currentRunners.append(x)
@@ -169,6 +178,7 @@ class MainWindow(QtWidgets.QMainWindow):
             else:
                 self.runnerCombobox.adjustSize()
                 self.runnerCombobox.addItems(self.currentRunners)
+
                 self.runnerCombobox.setEnabled(True)
         else:
             self.runnerCombobox.adjustSize()
@@ -186,6 +196,10 @@ class MainWindow(QtWidgets.QMainWindow):
             if "(Modded)" in self.gameList.selectedItems()[0].text():
                 game = self.gameList.selectedItems(
                 )[0].text().replace(" (Modded)", "")
+                self.settings.endGroup()
+                lastVersion = self.settings.value(
+                    f"Modpacks/{self.gameList.selectedItems()[1].text()}/Last Version")
+                self.settings.beginGroup("Games")
                 for i in bases:
                     if self.settings.value(f"{i}/game") == game:
                         self.settings.beginGroup(i)
@@ -218,12 +232,16 @@ class MainWindow(QtWidgets.QMainWindow):
         self.process.finished.connect(self.gameClosed)
         if "(Modded)" not in self.gameList.selectedItems()[0].text():
             game = self.gameList.selectedItems()[1].text()
+            self.settings.setValue(
+                f"Games/{game}/Last Runner", self.runnerText)
             self.settings.beginGroup(f"Games/{game}/{version_text}")
         else:
             keys = self.settings.allKeys()
             for i in keys:
                 if f"/{version_text}/crc" in i:
                     game = i.replace("/crc", "")
+                    self.settings.setValue(
+                        f"Modpacks/{self.gameList.selectedItems()[1].text()}/Last Runner", self.runnerText)
                     self.settings.beginGroup(game)
         try:
             game = self.settings.value("path")
