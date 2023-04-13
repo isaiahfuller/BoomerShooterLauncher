@@ -9,6 +9,7 @@ class FirstRun(QtWidgets.QDialog):
     def __init__(self, parent):
         super().__init__(parent=parent)
         parent = self.parent()
+        self.setModal(True)
         # self.status = self.statusBar()
         self.logger = logging.getLogger("Main window")
         if "--debug" in sys.argv:
@@ -19,8 +20,8 @@ class FirstRun(QtWidgets.QDialog):
         addPortButton = QtWidgets.QPushButton("Add Source Port")
         importButton = QtWidgets.QPushButton("Import Modpack")
         mainLayout = QtWidgets.QVBoxLayout()
-        mainLayout.addWidget(QtWidgets.QLabel("Right now, this launcher only supports Doom-based games."))
-        mainLayout.addWidget(QtWidgets.QLabel("You can start by adding a folder with games (Doom 3 BFG and Doom Eternal work): "))
+        mainLayout.addWidget(QtWidgets.QLabel("Right now, this launcher only supports Doom (1 and 2) based games."))
+        mainLayout.addWidget(QtWidgets.QLabel("You can start by adding a folder with games (Doom 3 BFG and Doom Eternal installs work): "))
         mainLayout.addWidget(addGameButton, 0, QtGui.Qt.AlignRight)
         mainLayout.addWidget(QtWidgets.QLabel("Choose a source port to run the game with: "))
         mainLayout.addWidget(addPortButton, 0, QtGui.Qt.AlignRight)

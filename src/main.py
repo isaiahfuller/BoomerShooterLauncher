@@ -121,7 +121,6 @@ class MainWindow(QtWidgets.QMainWindow):
         self.settings.beginGroup("MainWindow")
         geometry = self.settings.value("geometry", QtCore.QByteArray())
         firstRun = False
-        firstRun = True
         if geometry.isEmpty():
             firstRun = True
             self.setGeometry(0, 0, 800, 600)
