@@ -11,7 +11,12 @@ A launcher for old-school FPS games
 </details>
 ------------
 
-**Installation** - Requires Python 3.10
+**Running** - Requires Python 3.10 or higher
 
     pip install -r requirements.txt
     python main.py
+
+**Building** - Requires Python 3.10
+
+    pip install -r requirements.txt
+    python setup.py build
