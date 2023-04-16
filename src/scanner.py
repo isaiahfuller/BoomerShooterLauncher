@@ -19,12 +19,13 @@ class GameScanner(QtWidgets.QFileDialog):
         self.timer = None
         match platform.system():
             case "Windows":
-                self.settings = QtCore.QSettings("fullerSpectrum", "Boomer Shooter Launcher")
+                self.settings = QtCore.QSettings("Isaiah Fuller", "Boomer Shooter Launcher")
             case "Linux":
                 self.settings = QtCore.QSettings("boomershooterlauncher", "config")
         self.fileTypes = ("wad", "pk3", "ipk3")
-        self.setFileMode(QtWidgets.QFileDialog.ExistingFiles)
-        self.setNameFilter("Game files (*.wad, *.pk3, *.ipk3)")
+        # self.setFileMode(QtWidgets.QFileDialog.ExistingFiles)
+        self.setFileMode(QtWidgets.QFileDialog.Directory)
+        # self.setNameFilter("Game files (*.wad, *.pk3, *.ipk3)")
 
     def directoryCrawl(self, fileName, tableRefresh):
         """Enumerate files and directories"""

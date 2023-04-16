@@ -416,11 +416,23 @@ runners = {
         ],
         "executable": "gzdoom"
     },
+    "PrBoom+": {
+        "link": "https://github.com/coelckers/prboom-plus/releases/latest",
+        "description": "\"Modified PrBoom port with uncapped framerate, variable gamespeed, re-record, walkcam, chasecam, full mouselook, fov and other features without loss of compatibility with original DOOM.\"",
+        "games": ["Doom", "Doom II", "Final Doom", "Chex Quest"],
+        "executable": "prboom-plus"
+    },
     "Doom Retro": {
         "link": "https://github.com/bradharding/doomretro/releases/latest",
         "description": "\"Strive[s] to craft a unique ensemble of compelling features, while always respecting that classic, nostalgic DOOM experience[...]\"",
         "games": ["Doom", "Doom II", "Final Doom", "Chex Quest", "HacX"],
         "executable": "doomretro"
+    },
+    "Crispy Doom": {
+        "link": "http://latest.chocolate-doom.org/",
+        "description": "\"A friendly fork of Chocolate Doom that provides a higher display resolution, [...] and offers further optional visual, tactical and physical enhancements\"",
+        "games": ["Doom", "Doom II", "Final Doom", "Chex Quest"],
+        "executable": "crispy-doom"
     },
     "Chocolate Doom": {
         "link": "http://latest.chocolate-doom.org/",
@@ -445,17 +457,5 @@ runners = {
         "description": "\"Doom source port that accurately reproduces the experience of Doom as it was played in the 1990s.\"",
         "games": ["Strife"],
         "executable": "chocolate-strife"
-    },
-    "Crispy Doom": {
-        "link": "http://latest.chocolate-doom.org/",
-        "description": "\"A friendly fork of Chocolate Doom that provides a higher display resolution, [...] and offers further optional visual, tactical and physical enhancements\"",
-        "games": ["Doom", "Doom II", "Final Doom", "Chex Quest"],
-        "executable": "crispy-doom"
-    },
-    "PrBoom+": {
-        "link": "https://github.com/coelckers/prboom-plus/releases/latest",
-        "description": "\"Modified PrBoom port with uncapped framerate, variable gamespeed, re-record, walkcam, chasecam, full mouselook, fov and other features without loss of compatibility with original DOOM.\"",
-        "games": ["Doom", "Doom II", "Final Doom", "Chex Quest"],
-        "executable": "prboom-plus"
     }
 }

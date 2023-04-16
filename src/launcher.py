@@ -12,7 +12,7 @@ class GameLauncher(QtCore.QProcess):
         self.logger = logging.getLogger("Launcher")
         match platform.system():
             case "Windows":
-                self.settings = QtCore.QSettings("fullerSpectrum", "Boomer Shooter Launcher")
+                self.settings = QtCore.QSettings("Isaiah Fuller", "Boomer Shooter Launcher")
             case "Linux":
                 self.settings = QtCore.QSettings("boomershooterlauncher", "config")
         self.runner = None
@@ -39,8 +39,9 @@ class GameLauncher(QtCore.QProcess):
         filteredTitle = "".join(x for x in filteredTitle if x not in "\/:*?<>|\"")
         self.settings.endGroup()
         spArray = [str(runnerPath), "-iwad", gamePath]
-        for i in otherFiles:
+        if len(otherFiles) > 0:
             spArray.append("-file")
+        for i in otherFiles:
             spArray.append(i)
         match platform.system():
             case "Windows": runPath = Path(Path.home(), "AppData", "Roaming",
