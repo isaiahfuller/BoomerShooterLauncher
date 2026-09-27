@@ -2,6 +2,16 @@
 
 A launcher for old-school FPS games
 
+Use **Find Steam Games** in the toolbar or welcome dialog to scan installed Steam
+games for supported game files. The scan checks Steam's configured libraries,
+including additional drives and Linux Flatpak installations, and adds recognized
+files to your library. Configure a source port separately to launch them. If Steam
+is in an undiscovered location, use **Add Games** to select its game folder manually.
+
+## Documentation
+
+- [MVC refactor plan](docs/mvc-refactor-plan.md)
+
 <details>
 <summary>Screenshots</summary>
 <img src=https://user-images.githubusercontent.com/9921699/232340110-3b53d266-87fc-4c90-ac7e-ba10ef65571d.png></img>

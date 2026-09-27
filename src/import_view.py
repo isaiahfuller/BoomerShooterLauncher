@@ -2,8 +2,8 @@
 import sys
 import logging
 import webbrowser
-import platform
 import qtawesome as qta
+from repositories.settings_repository import SettingsRepository
 from PySide6 import QtCore, QtWidgets, QtGui
 
 class ModsImport(QtWidgets.QMainWindow):
@@ -17,13 +17,7 @@ class ModsImport(QtWidgets.QMainWindow):
         if "--debug" in sys.argv:
             self.logger.setLevel(logging.DEBUG)
         self.logger.info(f"{data}")
-        match platform.system():
-            case "Windows":
-                self.settings = QtCore.QSettings(
-                    "Isaiah Fuller", "Boomer Shooter Launcher")
-            case "Linux":
-                self.settings = QtCore.QSettings(
-                    "boomershooterlauncher", "config")
+        self.repository = SettingsRepository()
 
         mainLayout = QtWidgets.QVBoxLayout()
         self.modList = QtWidgets.QTableWidget()
@@ -167,17 +161,9 @@ class ModsImport(QtWidgets.QMainWindow):
     def saveModpack(self):
         """Saves modpack to registry and closes window"""
         self.logger.info(f"Saving modpack \"{self.name}\" for \"{self.base}\"")
-        self.settings.beginGroup(f"Modpacks/{self.name}")
-        self.settings.setValue("base", self.base)
-        self.settings.beginWriteArray("files")
-        names = list(self.mods.keys())
-        for i in range(0,len(self.mods)):
-            self.settings.setArrayIndex(i)
-            self.settings.setValue("name", names[i])
-            self.settings.setValue("path",self.mods[names[i]]["path"])
-            self.settings.setValue("source",self.mods[names[i]]["source"])
-        self.settings.endArray()
-        self.settings.endGroup()
+        files = [{"name": name, "path": mod["path"], "source": mod["source"]}
+                 for name, mod in self.mods.items()]
+        self.repository.save_modpack(self.name, self.base, files)
         self.parent().gameList.refresh()
         self.close()
 

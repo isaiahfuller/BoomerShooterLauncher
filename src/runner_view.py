@@ -3,8 +3,8 @@ import os
 from pathlib import Path
 import logging
 import webbrowser
-import platform
-import subprocess
+import shutil
+from repositories.settings_repository import SettingsRepository
 from PySide6 import QtCore, QtWidgets, QtGui
 import data
 
@@ -15,11 +15,7 @@ class RunnerView(QtWidgets.QMainWindow):
         self.setWindowModality(QtCore.Qt.ApplicationModal)
         self.logger = logging.getLogger("Runner Editor")
         self.logger.info("Opened")
-        match platform.system():
-            case "Windows":
-                self.settings = QtCore.QSettings("Isaiah Fuller", "Boomer Shooter Launcher")
-            case "Linux":
-                self.settings = QtCore.QSettings("boomershooterlauncher", "config")
+        self.repository = SettingsRepository()
 
         self.boxLayout = QtWidgets.QVBoxLayout()
         self.openedFromMenu = False
@@ -41,9 +37,22 @@ class RunnerView(QtWidgets.QMainWindow):
         self.boxLayout.addWidget(self.runnerList)
         self.boxLayout.addWidget(self.descriptionLabel)
 
+        self.boxLayout.addWidget(QtWidgets.QLabel("Program location:"))
+        self.programPath = QtWidgets.QLineEdit()
+        self.programPath.setPlaceholderText("Select a runner to find its executable")
+        self.programPath.setEnabled(False)
+        self.browseButton = QtWidgets.QPushButton("Browse…", self)
+        self.browseButton.setEnabled(False)
+        locationLayout = QtWidgets.QHBoxLayout()
+        locationLayout.addWidget(self.programPath)
+        locationLayout.addWidget(self.browseButton)
+        self.boxLayout.addLayout(locationLayout)
+        self.browseButton.clicked.connect(self.browseProgram)
+        self.programPath.textChanged.connect(self.updateSaveButton)
+
         self.buttonBox = QtWidgets.QHBoxLayout()
         self.downloadButton = QtWidgets.QPushButton("Download", self)
-        self.selectInstalledButton = QtWidgets.QPushButton("Select", self)
+        self.selectInstalledButton = QtWidgets.QPushButton("Save location", self)
         self.removeButton = QtWidgets.QPushButton("Remove", self)
 
         self.downloadButton.setEnabled(False)
@@ -85,9 +94,7 @@ class RunnerView(QtWidgets.QMainWindow):
         self.runnerList.clear()
         self.game = game
         if game == "all":
-            self.settings.beginGroup("Runners")
-            allRunners = self.settings.childGroups()
-            self.settings.endGroup()
+            allRunners = self.repository.runners()
             for i in allRunners:
                 self.runnerList.addItem(f"{i} [installed]")
             for i in data.runners:
@@ -99,37 +106,46 @@ class RunnerView(QtWidgets.QMainWindow):
                     if not self.runnerList.findItems(i, QtCore.Qt.MatchExactly):
                         self.runnerList.addItem(i)
         self.runnerList.addItem("Custom...")
+        self.updateText()
 
     def setRunner(self):
         """Change current runner to selected"""
-        installed = "[installed]" in self.name
-        self.name = self.name.replace(" [installed]", "")
+        self.name = self.name.removesuffix(" [installed]")
+        saved = self.repository.runners().get(self.name)
+        self.url = None
         if self.name == "Custom...":
             self.executable = "*"
             self.descriptionLabel.setText("Add a runner that isn't listed.")
-            self.selectInstalledButton.setEnabled(True)
-            self.downloadButton.setEnabled(False)
-            self.removeButton.setEnabled(False)
-        elif self.name not in data.runners:
-            self.executable = self.name
-            self.descriptionLabel.setText("Custom runner.")
-            self.selectInstalledButton.setEnabled(False)
-            self.removeButton.setEnabled(True)
-            self.downloadButton.setEnabled(False)
+        elif self.name in data.runners:
+            runner = data.runners[self.name]
+            self.executable = runner["executable"]
+            self.descriptionLabel.setText(runner["description"])
+            self.url = runner["link"]
         else:
-            for i in data.runners: # pylint: disable=consider-using-dict-items
-                if i == self.name:
-                    self.executable = data.runners[i]["executable"]
-                    self.descriptionLabel.setText(data.runners[i]["description"])
-                    self.url = data.runners[i]["link"]
-                    self.downloadButton.setEnabled(True)
-                    if installed: 
-                        self.selectInstalledButton.setEnabled(False)
-                        self.removeButton.setEnabled(True)
-                    else: 
-                        self.selectInstalledButton.setEnabled(True)
-                        self.removeButton.setEnabled(False)
-                    break
+            self.executable = saved["executable"] if saved else self.name
+            self.descriptionLabel.setText("Custom runner.")
+
+        detected = shutil.which(self.executable) if self.executable != "*" else None
+        self.programPath.setEnabled(True)
+        self.browseButton.setEnabled(True)
+        self.programPath.setPlaceholderText("Not found on PATH — browse for a program")
+        # A saved override takes priority over automatic discovery.
+        self.programPath.setText(saved["path"] if saved else (detected or ""))
+        self.downloadButton.setEnabled(bool(self.url))
+        self.removeButton.setEnabled(saved is not None)
+        self.updateSaveButton()
+
+    def updateSaveButton(self):
+        """Enable saving once a runner and a location are supplied."""
+        self.selectInstalledButton.setEnabled(
+            self.name is not None and bool(self.programPath.text()))
+
+    def browseProgram(self):
+        """Choose an executable, including an override for an installed runner."""
+        path, _ = self.runnerDialog.getOpenFileName(
+            self, "Choose runner program", self.programPath.text())
+        if path:
+            self.programPath.setText(path)
 
     def getDownloadLink(self):
         """Opens download page in default web browser"""
@@ -137,46 +153,45 @@ class RunnerView(QtWidgets.QMainWindow):
 
     def updateText(self):
         """Change name to currently selected source port"""
-        self.name = self.runnerList.currentItem().text()
+        item = self.runnerList.currentItem()
+        if item is None:
+            self.name = None
+            self.programPath.clear()
+            self.programPath.setEnabled(False)
+            self.browseButton.setEnabled(False)
+            self.downloadButton.setEnabled(False)
+            self.removeButton.setEnabled(False)
+            return
+        self.name = item.text()
         self.setRunner()
 
     def addToDb(self):
-        """Adds source port to registry"""
-        self.runnerDialog.setFileMode(QtWidgets.QFileDialog.ExistingFile)
-        selectedText = self.runnerList.selectedItems()[0].text()
-        match platform.system():
-            case "Windows":
-                files = self.runnerDialog.getOpenFileUrl()
-                filePath = files[0].toLocalFile()
-            case "Linux":
-                exe = self.executable
-                if exe == "*":
-                    files = self.runnerDialog.getOpenFileUrl()
-                    filePath = files[0].toLocalFile()
-                else:
-                    file = subprocess.run(["which", exe], stdout=subprocess.PIPE, check=True)
-                    filePath = Path(file.stdout.decode("utf-8"))
+        """Save the detected or user-selected executable location."""
+        if self.name is None or not self.programPath.text():
+            return
+        path = Path(self.programPath.text()).expanduser()
+        if not path.is_file() or not os.access(path, os.X_OK):
+            QtWidgets.QMessageBox.warning(
+                self, "Invalid program", "Choose an existing executable file.")
+            return
+        name = path.name if self.name == "Custom..." else self.name
         try:
-            if filePath != "":
-                if self.name == "Custom...":
-                    self.settings.beginGroup(f"Runners/{Path(filePath).name}")
-                else: self.settings.beginGroup(f"Runners/{selectedText}")
-                self.settings.setValue("path", str(filePath).strip())
-                self.settings.setValue("executable", self.executable)
-                self.settings.endGroup()
-        except Exception as e: # pylint: disable=broad-except
-            logging.exception(e)
-            logging.warning(f"[Runner List] Failed to add {selectedText} to db")
-        finally:
-            if len(os.fspath(filePath)) > 0:
-                self.builder(self.game)
-                self.selectInstalledButton.setEnabled(False)
-                if not self.openedFromMenu:
-                    self.close()
+            self.repository.save_runner(name, str(path.absolute()), self.executable)
+        except OSError as error:
+            self.logger.exception("Failed to save runner %s", name)
+            QtWidgets.QMessageBox.warning(self, "Unable to save runner", str(error))
+            return
+        self.builder(self.game)
+        if not self.openedFromMenu:
+            self.close()
+        else:
+            matches = self.runnerList.findItems(f"{name} [installed]", QtCore.Qt.MatchExactly)
+            if matches:
+                self.runnerList.setCurrentItem(matches[0])
 
     def removeRunner(self):
         """Removes source port from registry and combo box"""
-        self.settings.remove(f"Runners/{self.name}")
+        self.repository.remove_runner(self.name)
         self.builder(self.game)
 
     def closeEvent(self, event: QtGui.QCloseEvent) -> None:

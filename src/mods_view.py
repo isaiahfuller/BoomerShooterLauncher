@@ -1,8 +1,8 @@
 """The module for the modpack window"""
 import os
-import platform
 import logging
 import json
+from repositories.settings_repository import SettingsRepository
 from PySide6 import QtCore, QtWidgets, QtGui
 
 
@@ -13,13 +13,7 @@ class ModsView(QtWidgets.QMainWindow):
         self.setWindowModality(QtCore.Qt.ApplicationModal)
 
         self.logger = logging.getLogger("Modpack Editor")
-        match platform.system():
-            case "Windows":
-                self.settings = QtCore.QSettings(
-                    "Isaiah Fuller", "Boomer Shooter Launcher")
-            case "Linux":
-                self.settings = QtCore.QSettings(
-                    "boomershooterlauncher", "config")
+        self.repository = SettingsRepository()
 
         self.mods = {
             "name": "Mod name",
@@ -163,15 +157,13 @@ class ModsView(QtWidgets.QMainWindow):
     def baseComboBuilder(self):
         """Generate base game combo box options"""
         self.baseSelect.clear()
-        self.settings.beginGroup("Games")
         bases = []
-        for game in self.settings.childGroups():
-            if self.settings.value(f"{game}/game") not in bases:
-                bases.append(self.settings.value(f"{game}/game"))
-                self.baseSelect.addItem(self.settings.value(f"{game}/game"))
-        self.settings.endGroup()
+        for game in self.repository.games().values():
+            if game["game"] not in bases:
+                bases.append(game["game"])
+                self.baseSelect.addItem(game["game"])
         bases.sort()
-        self.mods["base"] = bases[0]
+        self.mods["base"] = bases[0] if bases else ""
 
     def baseChanged(self, text):
         """Updates var on change"""
@@ -227,23 +219,13 @@ class ModsView(QtWidgets.QMainWindow):
         """Saves modpack to registry"""
         name = self.mods["name"]
         if name != "":
-            self.settings.beginGroup(f"Modpacks/{name}")
-            self.settings.setValue("base", self.mods["base"])
-            self.settings.beginWriteArray("files")
-            for i in range(0, len(self.mods["files"])):
-                self.settings.setArrayIndex(i)
-                self.settings.setValue("name", self.mods["files"][i]["name"])
-                self.settings.setValue("path", self.mods["files"][i]["path"])
-                self.settings.setValue(
-                    "source", self.mods["files"][i]["source"])
-            self.settings.endArray()
-            self.settings.endGroup()
+            self.repository.save_modpack(name, self.mods["base"], self.mods["files"])
             self.close()
 
     def changeName(self, text):
         """Change name of mod pack"""
         name = self.mods["name"]
-        self.settings.remove(f"Modpacks/{name}")
+        self.repository.remove_modpack(name)
         self.logger.info("Removing %s", name)
         self.mods["name"] = text
 
@@ -273,33 +255,21 @@ class ModsView(QtWidgets.QMainWindow):
     def openFile(self):
         """Loads mod pack from registry"""
         name = self.gameList.selectedItems()[1].text()
-        self.settings.beginGroup(f"Modpacks/{name}")
+        pack = self.repository.modpacks()[name]
         self.nameEdit.setText(name)
-        self.baseSelect.setCurrentText(self.settings.value("base"))
-        self.mods["name"] = name
-        self.mods["base"] = self.settings.value("base")
-        size = self.settings.beginReadArray("files")
-        for i in range(0, size):
-            self.settings.setArrayIndex(i)
-            fileSplit = self.settings.value("path").split(os.sep)
-            fileName = fileSplit[len(fileSplit) - 1]
-            self.modList.addItem(fileName)
-            self.mods["files"].append({
-                    "name": self.settings.value("name"),
-                    "path": self.settings.value("path"),
-                    "source": self.settings.value("source")
-                })
-        self.settings.endArray()
-        # self.modNameEdit.setText(self.settings.value("files/1/name"))
-        self.pathLabel.setText(self.settings.value("files/1/path"))
-        self.modSourceEdit.setText(self.settings.value("files/1/source"))
-        self.settings.endGroup()
+        self.baseSelect.setCurrentText(pack["base"])
+        self.mods = pack
+        for file in pack["files"]:
+            self.modList.addItem(file["path"].split(os.sep)[-1])
+        first = pack["files"][0] if pack["files"] else {"path": "", "source": ""}
+        self.pathLabel.setText(first["path"])
+        self.modSourceEdit.setText(first["source"])
         self.showWindow()
 
     def rmFile(self):
         """Removes mod pack"""
         name = self.gameList.selectedItems()[1].text()
-        self.settings.remove(f"Modpacks/{name}")
+        self.repository.remove_modpack(name)
         self.logger.info("Removing %s", name)
         self.gameList.refresh()
 

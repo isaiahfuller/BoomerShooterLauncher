@@ -3,6 +3,7 @@ import os
 import logging
 import platform
 from pathlib import Path
+from repositories.settings_repository import SettingsRepository
 from PySide6 import QtCore, QtWidgets
 
 class GameLauncher(QtCore.QProcess):
@@ -10,11 +11,7 @@ class GameLauncher(QtCore.QProcess):
     def __init__(self, parent):
         super().__init__(parent=parent)
         self.logger = logging.getLogger("Launcher")
-        match platform.system():
-            case "Windows":
-                self.settings = QtCore.QSettings("Isaiah Fuller", "Boomer Shooter Launcher")
-            case "Linux":
-                self.settings = QtCore.QSettings("boomershooterlauncher", "config")
+        self.repository = SettingsRepository()
         self.runner = None
         self.finished.connect(self.processFinished)
 
@@ -22,13 +19,12 @@ class GameLauncher(QtCore.QProcess):
         """Launches game"""
         # pylint: disable=anomalous-backslash-in-string
         self.runner = runner
-        self.settings.beginGroup("Runners")
-        path = self.settings.value(f"{runner}/path")
+        path = self.repository.runners()[runner]["path"]
         self.logger.debug(f"Game: {game} @ {gamePath}")
         self.logger.debug(f"Runner: {runner}")
         self.logger.debug(f"Path: {path}")
         self.logger.debug(f"Other files: {otherFiles}")
-        runnerPath = Path(self.settings.value(f"{runner}/path"))
+        runnerPath = Path(path)
         if not Path(path).is_file():
             raise FileNotFoundError("Executable missing")
         gameDir = str(gamePath).split(os.sep)
@@ -37,7 +33,6 @@ class GameLauncher(QtCore.QProcess):
         spArray = [""]*3
         filteredTitle = self.parent().gameList.game
         filteredTitle = "".join(x for x in filteredTitle if x not in "\/:*?<>|\"")
-        self.settings.endGroup()
         spArray = [str(runnerPath), "-iwad", gamePath]
         if len(otherFiles) > 0:
             spArray.append("-file")

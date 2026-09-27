@@ -4,12 +4,13 @@ import os
 import logging
 import platform
 import json
+from repositories.settings_repository import SettingsRepository
 from PySide6 import QtCore, QtWidgets, QtGui
 import qtawesome as qta
 from discord import Discord
-import data
 from games_view import GamesView
 from scanner import GameScanner
+from steam_scanner import SteamScanner
 from runner_view import RunnerView
 from mods_view import ModsView
 from launcher import GameLauncher
@@ -32,13 +33,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self.theme = Theme(app.setStyleSheet)
 
-        match self.platform:
-            case "Windows":
-                self.settings = QtCore.QSettings(
-                    "Isaiah Fuller", "Boomer Shooter Launcher")
-            case "Linux":
-                self.settings = QtCore.QSettings(
-                    "boomershooterlauncher", "config")
+        self.repository = SettingsRepository()
 
         self.readSettings()
         self.discord = Discord()
@@ -71,6 +66,9 @@ class MainWindow(QtWidgets.QMainWindow):
 
         fileToolbar.addAction(codeIcon, "&Manage Ports", self.showRunnerList)
         fileToolbar.addAction(plusIcon, "&Add Games", self.gameScanner)
+        self.steamScanAction = fileToolbar.addAction(
+            "Find Steam Games", self.scanSteamGames)
+        self.steamScanner = None
         fileToolbar.addAction(listIcon, "&New Modpack", self.showModWindow)
         fileToolbar.addAction(loadIcon, "&Import Modpack", self.importModpack)
 
@@ -113,14 +111,11 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def writeSettings(self):
         """Write window geometry to registry"""
-        self.settings.beginGroup("MainWindow")
-        self.settings.setValue("geometry", self.saveGeometry())
-        self.settings.endGroup()
+        self.repository.save_window_geometry(self.saveGeometry())
 
     def readSettings(self):
         """Read window geometry from registry"""
-        self.settings.beginGroup("MainWindow")
-        geometry = self.settings.value("geometry", QtCore.QByteArray())
+        geometry = self.repository.window_geometry()
         firstRun = False
         if geometry.isEmpty():
             firstRun = True
@@ -130,7 +125,6 @@ class MainWindow(QtWidgets.QMainWindow):
         if firstRun:
             self.logger.info("First run")
             FirstRun(self).showWindow()
-        self.settings.endGroup()
 
     def gameScanner(self):
         """Scans files"""
@@ -143,6 +137,38 @@ class MainWindow(QtWidgets.QMainWindow):
         self.gameList.refresh()
         scanner = None
 
+    def scanSteamGames(self):
+        """Discover supported game files in installed Steam games."""
+        if self.steamScanner is not None:
+            return
+        self.steamScanAction.setEnabled(False)
+        self.status.showMessage("Finding installed Steam games…")
+        self.steamScanner = SteamScanner(self)
+        self.steamScanner.progress.connect(self.status.showMessage)
+        self.steamScanner.completed.connect(self.steamScanCompleted)
+        self.steamScanner.failed.connect(self.steamScanFailed)
+        self.steamScanner.finished.connect(self.steamScanFinished)
+        self.steamScanner.start()
+
+    def steamScanCompleted(self, installed, found, errors):
+        self.gameList.refresh()
+        if not installed:
+            message = "No installed Steam games found. Use Add Games to choose a folder manually."
+        else:
+            message = f"Steam scan complete: {found} supported game files found in {installed} installs."
+        if errors:
+            message += f" {errors} files or folders could not be read."
+        self.status.showMessage(message)
+
+    def steamScanFailed(self, error):
+        self.gameList.refresh()
+        self.status.showMessage(f"Steam scan failed: {error}")
+
+    def steamScanFinished(self):
+        self.steamScanner.deleteLater()
+        self.steamScanner = None
+        self.steamScanAction.setEnabled(True)
+
     def getRunners(self):
         """Add all compatible source ports to combobox"""
         self.currentRunners.clear()
@@ -152,23 +178,14 @@ class MainWindow(QtWidgets.QMainWindow):
             )[0].text().replace(" (Modded)", "")
 
             self.game = game
-            self.settings.beginGroup("Runners")
-            res = self.settings.childGroups()
-            self.settings.endGroup()
-            lastRunner = self.settings.value(f"Games/{game}/Last Runner")
-            if "(Modded)" in self.gameList.selectedItems()[0].text():
-                lastRunner = self.settings.value(
-                    f"Modpacks/{self.gameList.selectedItems()[1].text()}/Last Runner")
-            if lastRunner:
-                self.runnerCombobox.addItem(lastRunner)
-            for x in res:
-                if x == lastRunner:
-                    continue
-                for y in data.runners:  # pylint: disable=consider-using-dict-items
-                    if game in data.runners[y]["games"] and x in y:
-                        self.currentRunners.append(x)
-                if x not in data.runners:
-                    self.currentRunners.append(x)
+            is_modpack = "(Modded)" in self.gameList.selectedItems()[0].text()
+            selection_name = self.gameList.selectedItems()[1].text()
+            lastRunner, _ = self.repository.last_selection(selection_name, modpack=is_modpack)
+            self.currentRunners.extend(
+                runner.name for runner in self.repository.library().compatible_runners(
+                    game, preferred=lastRunner
+                )
+            )
             self.logger.debug(
                 f"Compatible runners for \"{game}\": {self.currentRunners}")
             if len(self.currentRunners) == 0:
@@ -190,40 +207,17 @@ class MainWindow(QtWidgets.QMainWindow):
         self.currentVersions.clear()
         self.versionCombobox.clear()
         if self.gameList.selectedIndexes():
-            self.settings.beginGroup("Games")
-            bases = self.settings.childGroups()
-            res = []
-            if "(Modded)" in self.gameList.selectedItems()[0].text():
-                game = self.gameList.selectedItems(
-                )[0].text().replace(" (Modded)", "")
-                self.settings.endGroup()
-                lastVersion = self.settings.value(
-                    f"Modpacks/{self.gameList.selectedItems()[1].text()}/Last Version")
-                if lastVersion:
-                    self.versionCombobox.addItem(lastVersion)
-                self.settings.beginGroup("Games")
-                for i in bases:
-                    if self.settings.value(f"{i}/game") == game:
-                        self.settings.beginGroup(i)
-                        res = res + self.settings.childGroups()
-                        self.settings.endGroup()
-            else:
-                game = self.gameList.selectedItems()[1].text()
-                self.settings.beginGroup(game)
-                lastVersion = self.settings.value("Last Version")
-                if lastVersion:
-                    self.versionCombobox.addItem(lastVersion)
-                res = self.settings.childGroups()
-                self.settings.endGroup()
-            self.settings.endGroup()
-            for x in res:
-                self.currentVersions.append(x)
-            for version in self.currentVersions:
-                if version != lastVersion:
-                    self.versionCombobox.addItem(version)
+            is_modpack = "(Modded)" in self.gameList.selectedItems()[0].text()
+            selection_name = self.gameList.selectedItems()[1].text()
+            _, lastVersion = self.repository.last_selection(selection_name, modpack=is_modpack)
+            versions = self.repository.library().installed_versions(
+                selection_name, modpack=is_modpack, preferred=lastVersion
+            )
+            self.currentVersions.extend(version.name for version in versions)
+            self.versionCombobox.addItems(self.currentVersions)
             self.versionCombobox.adjustSize()
-            self.versionCombobox.setEnabled(True)
-            self.logger.debug(f"\"{game}\" versions: {res}")
+            self.versionCombobox.setEnabled(bool(versions))
+            self.logger.debug(f"\"{selection_name}\" versions: {self.currentVersions}")
         else:
             self.versionCombobox.adjustSize()
             self.versionCombobox.setEnabled(False)
@@ -237,25 +231,20 @@ class MainWindow(QtWidgets.QMainWindow):
         self.process = GameLauncher(self)
         self.process.finished.connect(self.clearStatus)
         self.process.finished.connect(self.gameClosed)
-        if "(Modded)" not in self.gameList.selectedItems()[0].text():
-            game = self.gameList.selectedItems()[1].text()
-            self.settings.setValue(
-                f"Games/{game}/Last Runner", self.runnerText)
-            self.settings.setValue(f"Games/{game}/Last Version", version_text)
-            self.settings.beginGroup(f"Games/{game}/{version_text}")
-        else:
-            keys = self.settings.allKeys()
-            for i in keys:
-                if f"/{version_text}/crc" in i:
-                    game = i.replace("/crc", "")
-                    gameName = self.gameList.selectedItems()[1].text()
-                    self.settings.setValue(
-                        f"Modpacks/{gameName}/Last Runner", self.runnerText)
-                    self.settings.setValue(
-                        f"Modpacks/{gameName}/Last Version", version_text)
-                    self.settings.beginGroup(game)
         try:
-            game = self.settings.value("path")
+            is_modpack = "(Modded)" in self.gameList.selectedItems()[0].text()
+            selection_name = self.gameList.selectedItems()[1].text()
+            self.repository.save_selection(
+                selection_name, self.runnerText, version_text, modpack=is_modpack)
+            games = self.repository.games()
+            if is_modpack:
+                base_game = self.gameList.selectedItems()[0].text().replace(" (Modded)", "")
+                game = next(release["path"] for base in games.values()
+                            if base["game"] == base_game
+                            for name, release in base["releases"].items()
+                            if name == version_text)
+            else:
+                game = games[selection_name]["releases"][version_text]["path"]
             if len(self.currentRunners) == 0:
                 runnerList.showWindow(self.game)
             else:
@@ -277,7 +266,6 @@ class MainWindow(QtWidgets.QMainWindow):
             errorWindow = QtWidgets.QErrorMessage(self)
             errorWindow.showMessage(f"Failed to launch game ({e})")
         finally:
-            self.settings.endGroup()
             self.process = None
             runnerList = None
 
@@ -339,6 +327,9 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def closeEvent(self, event: QtGui.QCloseEvent):
         """Saves settings before closing"""
+        if self.steamScanner is not None:
+            self.steamScanner.requestInterruption()
+            self.steamScanner.wait()
         self.writeSettings()
         self.discord.clear()
         return super().closeEvent(event)
