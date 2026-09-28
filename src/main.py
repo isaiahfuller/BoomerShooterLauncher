@@ -4,6 +4,7 @@ import os
 import logging
 import platform
 import json
+from models.records import Modpack
 from repositories.settings_repository import SettingsRepository
 from PySide6 import QtCore, QtWidgets, QtGui
 import qtawesome as qta
@@ -173,19 +174,16 @@ class MainWindow(QtWidgets.QMainWindow):
         """Add all compatible source ports to combobox"""
         self.currentRunners.clear()
         self.runnerCombobox.clear()
-        if self.gameList.selectedIndexes():
-            game = self.gameList.selectedItems(
-            )[0].text().replace(" (Modded)", "")
+        record = self.gameList.selected_record
+        if record is not None:
+            game = record.base if isinstance(record, Modpack) else record.family
 
             self.game = game
-            is_modpack = "(Modded)" in self.gameList.selectedItems()[0].text()
-            selection_name = self.gameList.selectedItems()[1].text()
+            is_modpack = isinstance(record, Modpack)
+            selection_name = record.name
             lastRunner, _ = self.repository.last_selection(selection_name, modpack=is_modpack)
-            self.currentRunners.extend(
-                runner.name for runner in self.repository.library().compatible_runners(
-                    game, preferred=lastRunner
-                )
-            )
+            runners = self.repository.library().compatible_runners(game, preferred=lastRunner)
+            self.currentRunners.extend(runner.name for runner in runners)
             self.logger.debug(
                 f"Compatible runners for \"{game}\": {self.currentRunners}")
             if len(self.currentRunners) == 0:
@@ -194,7 +192,8 @@ class MainWindow(QtWidgets.QMainWindow):
                 self.runnerCombobox.addItem("Add source port")
             else:
                 self.runnerCombobox.adjustSize()
-                self.runnerCombobox.addItems(self.currentRunners)
+                for runner in runners:
+                    self.runnerCombobox.addItem(runner.name, runner)
 
                 self.runnerCombobox.setEnabled(True)
         else:
@@ -206,15 +205,17 @@ class MainWindow(QtWidgets.QMainWindow):
         """Add all versions of the selected game to combobox"""
         self.currentVersions.clear()
         self.versionCombobox.clear()
-        if self.gameList.selectedIndexes():
-            is_modpack = "(Modded)" in self.gameList.selectedItems()[0].text()
-            selection_name = self.gameList.selectedItems()[1].text()
+        record = self.gameList.selected_record
+        if record is not None:
+            is_modpack = isinstance(record, Modpack)
+            selection_name = record.name
             _, lastVersion = self.repository.last_selection(selection_name, modpack=is_modpack)
             versions = self.repository.library().installed_versions(
                 selection_name, modpack=is_modpack, preferred=lastVersion
             )
             self.currentVersions.extend(version.name for version in versions)
-            self.versionCombobox.addItems(self.currentVersions)
+            for version in versions:
+                self.versionCombobox.addItem(version.name, version)
             self.versionCombobox.adjustSize()
             self.versionCombobox.setEnabled(bool(versions))
             self.logger.debug(f"\"{selection_name}\" versions: {self.currentVersions}")
@@ -226,32 +227,32 @@ class MainWindow(QtWidgets.QMainWindow):
     def launchGame(self):
         """Launch currently selected game with currently selected source port"""
         runnerList = RunnerView(self)
-        version_text = self.versionCombobox.currentText()
-        self.runnerText = self.runnerCombobox.currentText()
+        version = self.versionCombobox.currentData()
+        version_text = version.name if version else ""
+        runner = self.runnerCombobox.currentData()
+        self.runnerText = runner.name if runner else ""
         self.process = GameLauncher(self)
         self.process.finished.connect(self.clearStatus)
         self.process.finished.connect(self.gameClosed)
         try:
-            is_modpack = "(Modded)" in self.gameList.selectedItems()[0].text()
-            selection_name = self.gameList.selectedItems()[1].text()
+            record = self.gameList.selected_record
+            if record is None:
+                raise ValueError("Select a game first")
+            is_modpack = isinstance(record, Modpack)
+            selection_name = record.name
             self.repository.save_selection(
                 selection_name, self.runnerText, version_text, modpack=is_modpack)
-            games = self.repository.games()
-            if is_modpack:
-                base_game = self.gameList.selectedItems()[0].text().replace(" (Modded)", "")
-                game = next(release["path"] for base in games.values()
-                            if base["game"] == base_game
-                            for name, release in base["releases"].items()
-                            if name == version_text)
-            else:
-                game = games[selection_name]["releases"][version_text]["path"]
+            version = self.versionCombobox.currentData()
+            if version is None:
+                raise ValueError("Select an installed game version")
+            game = version.path
             if len(self.currentRunners) == 0:
                 runnerList.showWindow(self.game)
             else:
                 self.originalPath = os.getcwd()
-                if "(Modded)" in self.gameList.selectedItems()[0].text():
+                if is_modpack:
                     self.process.runGame(
-                        self.game, game, self.runnerText, self.gameList.files)
+                        self.game, game, self.runnerText, [file.path for file in record.files])
                 else:
                     self.process.runGame(self.game, game, self.runnerText, [])
                 self.discordDetails = f"Playing {self.gameList.game} with {self.runnerText}"

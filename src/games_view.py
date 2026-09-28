@@ -1,8 +1,8 @@
 """Generate GamesView"""
-import os
 import logging
 
 from pathlib import Path
+from models.records import Game, Modpack
 from repositories.settings_repository import SettingsRepository
 from PySide6 import QtCore, QtWidgets
 from mods_view import ModsView
@@ -16,13 +16,6 @@ class GamesView(QtWidgets.QTableWidget):
         self.logger = logging.getLogger("Game List")
         self.logger.debug("Building game list")
         self.repository = SettingsRepository()
-
-        self.games = []
-        self.files = []
-        self.rowData = []
-        self.game = ""
-        self.selectedRow = 0
-        self.modpackSelected = False
 
         self.setAlternatingRowColors(True)
         self.setWordWrap(False)
@@ -43,73 +36,75 @@ class GamesView(QtWidgets.QTableWidget):
         self.viewport().installEventFilter(self)
 
         self.refresh()
-        self.itemSelectionChanged.connect(self.updateRow)
+
+    @property
+    def selected_record(self):
+        """Return the selected domain record, independent of displayed labels."""
+        rows = self.selectionModel().selectedRows()
+        if not rows:
+            return None
+        return self.item(rows[0].row(), 0).data(QtCore.Qt.UserRole)
+
+    @property
+    def game(self):
+        record = self.selected_record
+        return record.name if record else ""
 
     def refresh(self):
-        """Refresh list of games"""
-        self.logger.info("Refreshing table")
-        self.games.clear()
-        self.rowData.clear()
+        """Render a library snapshot and restore selection by record identity."""
+        selected = self.selected_record
+        identity = (type(selected), selected.name) if selected else None
+        library = self.repository.library()
+        rows = []
+        last_in_family = {game.family: game for game in library.games}
+        for game in library.games:
+            rows.append(game)
+            # Place packs after the last installed game in their base family.
+            if game == last_in_family[game.family]:
+                rows.extend(pack for pack in library.modpacks if pack.base == game.family)
+        blocker = QtCore.QSignalBlocker(self)
         self.clearContents()
-        games = self.repository.games()
-        self.setRowCount(len(games))
-        for i, (base, game) in enumerate(games.items()):
-            self.rowData.append((game["game"], base, game["version"]))
-            files = []
-            self.setItem(i, 0, QtWidgets.QTableWidgetItem(game["game"]))
-            self.setItem(i, 1, QtWidgets.QTableWidgetItem(base))
-            for release in game["releases"].values():
-                file_name = release["path"].split(os.sep)[-1]
-                files.append(f"{file_name} - {release['version']}")
-            self.setItem(i, 2, QtWidgets.QTableWidgetItem(", ".join(files)))
-        self.loadModpacks()
-
-    def loadModpacks(self):
-        """Refresh list of modpacks"""
-        self.logger.info("Refreshing modpacks")
-        for name, pack in self.repository.modpacks().items():
-            files = [str(Path(file["path"]).resolve()) for file in pack["files"]]
-            details = (pack["base"] + " (Modded)", name, "modpack", 0, "modpack", files)
-            items = self.findItems(pack["base"], QtCore.Qt.MatchExactly)
-            if items:
-                pos = items[len(items) - 1].row() + 1
-                self.insertRow(pos)
-                self.rowData.insert(pos, details)
-                self.setItem(pos, 0, QtWidgets.QTableWidgetItem(details[0]))
-                self.setItem(pos, 1, QtWidgets.QTableWidgetItem(details[1]))
-                self.setItem(pos, 2, QtWidgets.QTableWidgetItem(", ".join(details[5])))
-
-    def updateRow(self):
-        """Stores information of the currently selected game"""
-        if self.selectedItems():
-            self.game = self.selectedItems()[1].text()
-            for i, game in enumerate(self.repository.games().values()):
-                category = game["game"]
-                if self.selectedItems()[0].text().replace(" (Modded)", "") == category:
-                    self.selectedRow = i
-                    self.modpackSelected = True
-                    self.files = self.selectedItems()[2].text().split(", ")
-                    break
-                if self.selectedItems()[0].text() == category:
-                    self.selectedRow = i
-                    self.modpackSelected = False
-                    self.files.clear()
-                    break
+        self.setRowCount(len(rows))
+        selected_row = None
+        for index, record in enumerate(rows):
+            if isinstance(record, Game):
+                family = record.family or ""
+                files = ", ".join(
+                    f"{Path(version.path).name if version.path else ''} - {version.version}"
+                    for version in record.versions)
+            else:
+                family = f"{record.base} (Modded)"
+                files = ", ".join(file.path or "" for file in record.files)
+            for column, label in enumerate((family, record.name, files)):
+                item = QtWidgets.QTableWidgetItem(label)
+                item.setData(QtCore.Qt.UserRole, record)
+                self.setItem(index, column, item)
+            if (type(record), record.name) == identity:
+                selected_row = index
+        self.clearSelection()
+        if selected_row is not None:
+            self.selectRow(selected_row)
+        del blocker
+        self.itemSelectionChanged.emit()
 
     def generateMenu(self, pos):
         """Open menu at current cursor position"""
-        self.menu.exec_(self.mapToGlobal(pos))
+        if self.itemAt(pos) is not None and hasattr(self, "menu"):
+            self.menu.exec_(self.viewport().mapToGlobal(pos))
 
     def eventFilter(self, qobject: QtCore.QObject, event: QtCore.QEvent) -> bool:
         """Create and populate context menu"""
         # pylint: disable=attribute-defined-outside-init
         if(event.type() == QtCore.QEvent.MouseButtonPress and
         event.buttons() == QtCore.Qt.RightButton and qobject is self.viewport()):
-            item = self.itemAt(event.pos()).row()
-            row = self.rowData[item]
+            item = self.itemAt(event.pos())
+            if item is None:
+                return super().eventFilter(qobject, event)
+            self.selectRow(item.row())
+            record = item.data(QtCore.Qt.UserRole)
             self.menu = QtWidgets.QMenu(self)
             modsView = ModsView(self)
-            if row[2] == "modpack":
+            if isinstance(record, Modpack):
                 self.menu.addAction("Edit modpack", modsView.openFile)
                 self.menu.addAction("Remove modpack", modsView.rmFile)
             else:

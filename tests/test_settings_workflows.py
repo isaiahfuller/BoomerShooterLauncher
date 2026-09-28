@@ -19,6 +19,56 @@ from repositories.settings_repository import SettingsRepository
 
 
 class SettingsWorkflowTests(unittest.TestCase):
+    def test_record_selection_survives_labels_refresh_and_duplicate_versions(self):
+        app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+        main.app = app
+        with TemporaryDirectory() as directory:
+            factory = lambda: QtCore.QSettings(
+                str(Path(directory) / 'config.ini'), QtCore.QSettings.IniFormat)
+            repo = SettingsRepository(factory)
+            repo.save_window_geometry(QtWidgets.QMainWindow().saveGeometry())
+            for name, path in [('First', '/games/first.wad'), ('Second', '/games/second.wad')]:
+                repo.save_game(name, 'Registered', version='1.9', crc='1234',
+                               path=path, year=1993, game='Doom')
+            repo.save_runner('UZDoom', '/ports/uzdoom', 'uzdoom')
+            files = [{'name': 'a, b.pk3', 'path': '/mods/a, b.pk3', 'source': ''},
+                     {'name': 'last.wad', 'path': '/mods/last.wad', 'source': ''}]
+            # The same name can identify records in two different settings groups.
+            repo.save_modpack('First', 'Doom', files)
+            with patch('repositories.settings_repository.create_settings', factory), \
+                 patch.object(main, 'Theme'), patch.object(main, 'Discord'):
+                window = main.MainWindow()
+                view = window.gameList
+                view.selectRow(0)
+                self.assertEqual(view.selected_record.name, 'First')
+                view.selectRow(2)
+                self.assertIsInstance(view.selected_record, main.Modpack)
+                view.item(2, 0).setText('Different family label')
+                view.item(2, 1).setText('Different name label')
+                view.item(2, 2).setText('Different file label')
+                window.getRunners()
+                window.getVersions()
+                window.versionCombobox.setCurrentIndex(1)
+                window.versionCombobox.setItemText(1, 'Different version label')
+                window.runnerCombobox.setItemText(0, 'Different runner label')
+                with patch.object(GameLauncher, 'runGame') as launch:
+                    window.launchGame()
+                    launch.assert_called_once_with(
+                        'Doom', '/games/second.wad', 'UZDoom',
+                        ['/mods/a, b.pk3', '/mods/last.wad'])
+                self.assertEqual(repo.last_selection('First', modpack=True),
+                                 ('UZDoom', 'Registered'))
+                self.assertEqual(repo.last_selection('First'), (None, None))
+                view.refresh()
+                self.assertIsInstance(view.selected_record, main.Modpack)
+                self.assertEqual(view.selected_record.name, 'First')
+                repo.remove_modpack('First')
+                view.refresh()
+                self.assertIsNone(view.selected_record)
+                self.assertFalse(window.versionCombobox.isEnabled())
+                self.assertFalse(window.runnerCombobox.isEnabled())
+                window.close()
+
     def test_settings_backed_workflows(self):
         app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
         main.app = app

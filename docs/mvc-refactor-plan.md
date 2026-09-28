@@ -7,8 +7,8 @@ Status: persistence centralization and the initial domain-model slice are implem
 `src/repositories/settings_repository.py` now owns QSettings construction and all
 group, key, and array access. The main window, game list, runner editor, modpack
 editor/importer, scanner, and launcher use repository methods for persistence.
-Records currently use dictionaries; domain models and controllers remain future
-steps.
+Dictionary APIs remain for callers awaiting migration; the library adapter supplies
+domain records. Controllers remain a future step.
 
 The repository preserves the Windows organization/application names
 `Isaiah Fuller` / `Boomer Shooter Launcher` and the Linux names
@@ -47,9 +47,29 @@ ordered mod files and existing settings identities remain unchanged.
 
 Validated with domain tests and the existing isolated-settings/offscreen suite,
 including stale remembered selections and repository-to-model conversion.
-Next: replace remaining dictionary/positional consumers and display-text selection
-identities incrementally, then extract scanner identification with the IWADINFO task
-below. Controllers and widget moves remain pending.
+
+## Implemented: record-backed library selection
+
+The game table now renders `Game` and `Modpack` records and stores them in Qt item
+user data. Selection, context-menu actions, and modpack editing/removal resolve
+those records rather than parsing labels or positional tuples. Refresh preserves
+selection by record type and persisted name, and clears stale selections.
+Modpacks are grouped by their base family rather than matching arbitrary table text.
+
+Runner and version comboboxes carry domain records. Launching uses the selected
+version's path directly, including when multiple games in a family have identically
+named releases. Ordered mod paths come directly from the modpack, preserving commas
+and spaces. Saved selection keys and the settings schema remain unchanged.
+
+Validated with the isolated-settings/offscreen suite, including changed display
+labels, duplicate release names, game/modpack name collisions, refresh/removal, and
+ordered paths containing commas. Remembered versions still use the legacy release
+name, so duplicate names cannot be distinguished across restarts without a future
+settings-identity extension.
+
+Next: migrate remaining dialog dictionary consumers, then extract scanner
+identification with the IWADINFO task below. Launcher service extraction,
+controllers, and widget moves remain pending.
 
 ## Purpose
 

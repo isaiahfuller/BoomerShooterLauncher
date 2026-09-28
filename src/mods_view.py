@@ -24,7 +24,6 @@ class ModsView(QtWidgets.QMainWindow):
         self.setWindowTitle("Modpack Builder")
 
         self.gameList = self.parent()
-        self.games = self.gameList.games
 
         mainLayout = QtWidgets.QVBoxLayout()
         header = QtWidgets.QHBoxLayout()
@@ -254,7 +253,7 @@ class ModsView(QtWidgets.QMainWindow):
 
     def openFile(self):
         """Loads mod pack from registry"""
-        name = self.gameList.selectedItems()[1].text()
+        name = self.gameList.selected_record.name
         pack = self.repository.modpacks()[name]
         self.nameEdit.setText(name)
         self.baseSelect.setCurrentText(pack["base"])
@@ -268,7 +267,7 @@ class ModsView(QtWidgets.QMainWindow):
 
     def rmFile(self):
         """Removes mod pack"""
-        name = self.gameList.selectedItems()[1].text()
+        name = self.gameList.selected_record.name
         self.repository.remove_modpack(name)
         self.logger.info("Removing %s", name)
         self.gameList.refresh()
