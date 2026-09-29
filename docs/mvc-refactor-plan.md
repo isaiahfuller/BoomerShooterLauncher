@@ -67,9 +67,26 @@ ordered paths containing commas. Remembered versions still use the legacy releas
 name, so duplicate names cannot be distinguished across restarts without a future
 settings-identity extension.
 
-Next: migrate remaining dialog dictionary consumers, then extract scanner
-identification with the IWADINFO task below. Launcher service extraction,
-controllers, and widget moves remain pending.
+## Implemented: record-backed dialogs
+
+The runner editor stores runner identities in item data rather than parsing display
+labels. The modpack editor uses immutable modpack and mod-file drafts, and the
+importer keeps ordered mod-file records so duplicate filenames remain independent.
+Dialog reads use the library adapter; a record-writing repository adapter preserves
+the existing settings schema. JSON dictionaries remain at the import/export boundary.
+
+Reordering and removal keep file metadata aligned with selection, including empty
+packs. Export leaves local paths intact. Renaming changes only the draft until Save,
+then carries remembered selections to the new identity. Editing a pack whose base
+family is no longer installed preserves that family.
+
+Validated with 24 isolated-settings/offscreen tests, including export followed by
+editing, removal to empty, cancelled and saved renames, duplicate import filenames,
+and runner identity after display-label changes.
+
+Next: extract scanner identification with the IWADINFO task below. Launcher service
+extraction, controllers (including JSON workflow extraction), and widget moves remain
+pending.
 
 ## Purpose
 

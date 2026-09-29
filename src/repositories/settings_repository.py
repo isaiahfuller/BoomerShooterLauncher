@@ -149,6 +149,11 @@ class SettingsRepository:
             finally:
                 settings.endArray()
 
+    def save_modpack_record(self, pack):
+        """Persist an immutable draft using the existing array schema."""
+        from dataclasses import asdict
+        self.save_modpack(pack.name, pack.base, [asdict(file) for file in pack.files])
+
     def remove_modpack(self, name):
         with self._session("Modpacks", write=True) as settings:
             settings.remove(name)

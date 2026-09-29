@@ -1,5 +1,7 @@
 """Import mod packs"""
 import sys
+from dataclasses import replace
+from models.records import ModFile, Modpack
 import logging
 import webbrowser
 import qtawesome as qta
@@ -50,7 +52,7 @@ class ModsImport(QtWidgets.QMainWindow):
         modInfo.setAlignment(QtCore.Qt.AlignTop)
         modInfo.addWidget(QtWidgets.QLabel(f"Name: {self.name}"), 0, 0)
         modInfo.addWidget(QtWidgets.QLabel(f"Base Game: {self.base}"), 1, 0)
-        self.mods = {}
+        self.mods = tuple(ModFile(mod["name"], None, mod["source"]) for mod in mods)
         count = 0
         greenCheck = qta.icon("fa5s.check", color="green")
         redXmark = qta.icon("fa5s.times", color="red")
@@ -62,7 +64,6 @@ class ModsImport(QtWidgets.QMainWindow):
                 source = QtWidgets.QTableWidgetItem(redXmark,"")
             source.setToolTip(e["source"])
             self.modList.setItem(count,1,source)
-            self.mods[e["name"]] = { "source": e["source"], "found": False, "path": None}
             count+=1
         count = None
         self.downloadButton = QtWidgets.QPushButton("Download", self)
@@ -110,60 +111,55 @@ class ModsImport(QtWidgets.QMainWindow):
     def addDroppedModFile(self, file):
         """Add mod file to list"""
         fileName = file.split("/")[-1]
-        for i in range(len(self.mods)):
-            text = self.modList.item(i,0).text()
-            if text == fileName:
-                if not self.mods[text]["found"]:
-                    self.loadedCount+=1
-                self.mods[text]["found"] = True
-                self.mods[text]["path"] = file
-                self.logger.debug(f"Setting {text} Path: {self.mods[text]['path']}")
-                self.modList.setItem(i,2,QtWidgets.QTableWidgetItem(file))
-                self.updateStatus()
+        for row, mod in enumerate(self.mods):
+            if mod.name == fileName and mod.path is None:
+                self.setModPath(row, file)
                 break
 
+    def setModPath(self, row, path):
+        """Resolve a file by row identity, preserving duplicate names and order."""
+        mods = list(self.mods)
+        mods[row] = replace(mods[row], path=path)
+        self.mods = tuple(mods)
+        self.modList.setItem(row, 2, QtWidgets.QTableWidgetItem(path))
+        self.updateStatus()
+
     def addModFile(self):
-        """Adds mod to list"""
+        """Choose a local file for the selected entry."""
+        row = self.modList.currentRow()
+        if not 0 <= row < len(self.mods):
+            return
         chooser = QtWidgets.QFileDialog(self)
-        chooser.setFileMode(QtWidgets.QFileDialog.ExistingFiles)
-        currentText = self.modList.item(self.modList.currentRow(),0).text()
-        chooser.setNameFilter(f"{currentText} (*).{currentText.split('.')[-1]}")
+        chooser.setFileMode(QtWidgets.QFileDialog.ExistingFile)
+        name = self.mods[row].name or ""
+        chooser.setNameFilter(f"{name} (*).{name.split('.')[-1]}")
         if chooser.exec():
-            modFile = chooser.selectedFiles()[0]
-            self.mods[currentText]["path"] = modFile
-            if not self.mods[currentText]["found"]:
-                self.loadedCount+=1
-            self.mods[currentText]["found"] = True
-            newPath = QtWidgets.QTableWidgetItem(modFile)
-            self.modList.setItem(self.modList.currentRow(),2,newPath)
-            self.updateStatus()
+            self.setModPath(row, chooser.selectedFiles()[0])
 
     def updateStatus(self):
         """Update mod counts in the status bar"""
+        self.loadedCount = sum(mod.path is not None for mod in self.mods)
         self.status.showMessage(f"{len(self.mods)} mods, {self.loadedCount} loaded")
-        if self.loadedCount == len(self.mods):
-            self.finishButton.setDisabled(False)
+        self.finishButton.setEnabled(self.loadedCount == len(self.mods))
 
     def selectedModChanged(self, currentRow):
         """Updates vars on change"""
-        currentItem = self.modList.item(currentRow,0).text()
-        self.browseButton.setDisabled(False)
-        if len(self.mods[currentItem]["source"]) > 0:
-            self.downloadButton.setDisabled(False)
-        else:
-            self.downloadButton.setDisabled(True)
+        valid = 0 <= currentRow < len(self.mods)
+        self.browseButton.setEnabled(valid)
+        self.downloadButton.setEnabled(valid and bool(self.mods[currentRow].source))
 
     def downloadMod(self):
-        """Opens download page in default web browser"""
-        currentItem = self.modList.item(self.modList.currentRow(),1).toolTip()
-        webbrowser.open(currentItem)
+        """Open the selected record's source."""
+        row = self.modList.currentRow()
+        if 0 <= row < len(self.mods) and self.mods[row].source:
+            webbrowser.open(self.mods[row].source)
 
     def saveModpack(self):
         """Saves modpack to registry and closes window"""
         self.logger.info(f"Saving modpack \"{self.name}\" for \"{self.base}\"")
-        files = [{"name": name, "path": mod["path"], "source": mod["source"]}
-                 for name, mod in self.mods.items()]
-        self.repository.save_modpack(self.name, self.base, files)
+        if any(mod.path is None for mod in self.mods):
+            return
+        self.repository.save_modpack_record(Modpack(self.name, self.base, self.mods))
         self.parent().gameList.refresh()
         self.close()
 

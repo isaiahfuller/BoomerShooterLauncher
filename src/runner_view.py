@@ -4,6 +4,7 @@ from pathlib import Path
 import logging
 import webbrowser
 import shutil
+from models.records import Runner
 from repositories.settings_repository import SettingsRepository
 from PySide6 import QtCore, QtWidgets, QtGui
 import data
@@ -94,24 +95,30 @@ class RunnerView(QtWidgets.QMainWindow):
         self.runnerList.clear()
         self.game = game
         if game == "all":
-            allRunners = self.repository.runners()
+            allRunners = self.repository.library().runners
             for i in allRunners:
-                self.runnerList.addItem(f"{i} [installed]")
+                self.addRunnerItem(i, installed=True)
             for i in data.runners:
-                if not self.runnerList.findItems(i, QtCore.Qt.MatchContains):
-                    self.runnerList.addItem(i)
+                if i not in {runner.name for runner in allRunners}:
+                    self.addRunnerItem(Runner(i, None, data.runners[i]["executable"]))
         else:
             for i in data.runners: # pylint: disable=consider-using-dict-items
                 if game in data.runners[i]["games"]:
                     if not self.runnerList.findItems(i, QtCore.Qt.MatchExactly):
-                        self.runnerList.addItem(i)
-        self.runnerList.addItem("Custom...")
+                        self.addRunnerItem(Runner(i, None, data.runners[i]["executable"]))
+        self.addRunnerItem(None)
         self.updateText()
+
+    def addRunnerItem(self, runner, installed=False):
+        item = QtWidgets.QListWidgetItem(
+            runner.name + (" [installed]" if installed else "") if runner else "Custom...")
+        item.setData(QtCore.Qt.UserRole, runner)
+        self.runnerList.addItem(item)
 
     def setRunner(self):
         """Change current runner to selected"""
-        self.name = self.name.removesuffix(" [installed]")
-        saved = self.repository.runners().get(self.name)
+        saved = next((runner for runner in self.repository.library().runners
+                      if runner.name == self.name), None)
         self.url = None
         if self.name == "Custom...":
             self.executable = "*"
@@ -122,7 +129,7 @@ class RunnerView(QtWidgets.QMainWindow):
             self.descriptionLabel.setText(runner["description"])
             self.url = runner["link"]
         else:
-            self.executable = saved["executable"] if saved else self.name
+            self.executable = saved.executable if saved else self.name
             self.descriptionLabel.setText("Custom runner.")
 
         detected = shutil.which(self.executable) if self.executable != "*" else None
@@ -130,7 +137,7 @@ class RunnerView(QtWidgets.QMainWindow):
         self.browseButton.setEnabled(True)
         self.programPath.setPlaceholderText("Not found on PATH — browse for a program")
         # A saved override takes priority over automatic discovery.
-        self.programPath.setText(saved["path"] if saved else (detected or ""))
+        self.programPath.setText(saved.path or "" if saved else (detected or ""))
         self.downloadButton.setEnabled(bool(self.url))
         self.removeButton.setEnabled(saved is not None)
         self.updateSaveButton()
@@ -162,7 +169,8 @@ class RunnerView(QtWidgets.QMainWindow):
             self.downloadButton.setEnabled(False)
             self.removeButton.setEnabled(False)
             return
-        self.name = item.text()
+        runner = item.data(QtCore.Qt.UserRole)
+        self.name = runner.name if runner else "Custom..."
         self.setRunner()
 
     def addToDb(self):

@@ -80,6 +80,17 @@ class RunnerViewTests(unittest.TestCase):
             warning.assert_called_once()
         self.assertEqual(self.repo.runners(), {})
 
+    def test_runner_identity_does_not_depend_on_display_label(self):
+        name = "My port [installed]"
+        self.repo.save_runner(name, str(self.program("port")), "*")
+        self.view.builder("all")
+        item = self.view.runnerList.findItems(name + " [installed]", QtCore.Qt.MatchExactly)[0]
+        item.setText("Changed display label")
+        self.view.runnerList.setCurrentItem(item)
+        self.assertEqual(self.view.name, name)
+        self.view.removeRunner()
+        self.assertNotIn(name, self.repo.runners())
+
     def test_existing_custom_runner_can_change_location_without_rename(self):
         original = self.program('original')
         replacement = self.program('replacement')

@@ -1,5 +1,6 @@
 """Offscreen integration checks with isolated settings and external services mocked."""
 
+from dataclasses import asdict, replace
 import os
 os.environ['QT_QPA_PLATFORM'] = 'offscreen'
 import sys
@@ -117,13 +118,13 @@ class SettingsWorkflowTests(unittest.TestCase):
                 editor = ModsView(window.gameList)
                 with patch.object(editor, 'showWindow'):
                     editor.openFile()
-                assert editor.mods['files'] == files
-                editor.mods['files'] = files[1:]
+                assert [asdict(file) for file in editor.mods.files] == files
+                editor.mods = replace(editor.mods, files=editor.mods.files[1:])
                 editor.saveFile()
                 assert repo.modpacks()['Pack']['files'] == files[1:]
                 importer = ModsImport(window, {'name': 'Imported', 'base': 'Doom',
                                                'mods': [{'name': 'import.pk3', 'source': ''}]})
-                importer.mods['import.pk3']['path'] = '/mods/import.pk3'
+                importer.setModPath(0, '/mods/import.pk3')
                 importer.saveModpack()
                 assert repo.modpacks()['Imported']['files'][0]['path'] == '/mods/import.pk3'
                 runners = RunnerView(window)
