@@ -71,7 +71,7 @@ class SettingsWorkflowTests(unittest.TestCase):
                 self.assertFalse(window.runnerCombobox.isEnabled())
                 window.close()
 
-    def test_launch_failures_are_reported_by_window(self):
+    def test_launch_controller_signals_update_window(self):
         app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
         main.app = app
         with TemporaryDirectory() as directory:
@@ -83,20 +83,13 @@ class SettingsWorkflowTests(unittest.TestCase):
                  patch.object(main, 'Theme'), patch.object(main, 'Discord'), \
                  patch('main.QtWidgets.QErrorMessage') as message:
                 window = main.MainWindow()
-                window.runnerText = 'UZDoom'
-                process = GameLauncher(window)
-                window.process = process
-                window.game_running = True
-                window._launch_finished(process, 3, QtCore.QProcess.CrashExit)
-                self.assertIsNone(window.process)
+                window.launchController.started.emit('Doom', 'UZDoom', 'Registered')
+                self.assertTrue(window.game_running)
+                self.assertIn('Playing Doom with UZDoom', window.status.currentMessage())
+                window.launchController.stopped.emit()
                 self.assertFalse(window.game_running)
+                window.launchController.failed.emit('UZDoom exited with code 3')
                 self.assertIn('code 3', message.return_value.showMessage.call_args.args[0])
-                process = GameLauncher(window)
-                window.process = process
-                window._launch_error(process, QtCore.QProcess.FailedToStart)
-                self.assertIsNone(window.process)
-                self.assertIn('Failed to start',
-                              message.return_value.showMessage.call_args.args[0])
                 window.close()
 
     def test_settings_backed_workflows(self):

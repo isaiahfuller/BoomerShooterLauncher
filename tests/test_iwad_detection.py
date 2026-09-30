@@ -47,7 +47,7 @@ class IWadDetectionTests(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as temp:
             repository = Repository()
-            path = Path(temp) / 'renamed.wad'
+            path = Path(temp) / 'doom2.wad'
             make_wad(path, ['MAP01'])
             self.assertTrue(scan_game_file(path, repository))
             self.assertEqual(repository.saved[-1][0][0], 'Doom II: Hell on Earth')
@@ -59,6 +59,23 @@ class IWadDetectionTests(unittest.TestCase):
             self.assertTrue(scan_game_file(fallback, repository))
             self.assertEqual(repository.saved[-1][0][0], 'Doom')
             self.assertIsNone(repository.saved[-1][1]['label'])
+
+    def test_doom_rules_require_their_filenames(self):
+        catalog = bundled_catalog()
+        cases = (
+            ('DOOM 2: Hell on Earth', 'doom2.wad', 'custom_map.wad'),
+            ('DOOM Shareware', 'doom1.wad', 'episode.wad'),
+            ('The Ultimate DOOM', 'doom.wad', 'renamed.wad'),
+        )
+        with tempfile.TemporaryDirectory() as temp:
+            for rule_name, expected_name, other_name in cases:
+                rule = next(rule for rule in catalog.definitions if rule.name == rule_name)
+                expected = Path(temp) / expected_name
+                other = Path(temp) / other_name
+                make_wad(expected, rule.must_contain)
+                make_wad(other, rule.must_contain)
+                self.assertEqual(detect_wad(expected).name, rule_name)
+                self.assertIsNone(detect_wad(other))
 
     def test_ultimate_doom_rule_matches_before_registered(self):
         catalog = bundled_catalog()
@@ -80,7 +97,7 @@ class IWadDetectionTests(unittest.TestCase):
         definition = next(rule for rule in bundled_catalog().definitions
                           if rule.name == 'DOOM: KEX Edition')
         with tempfile.TemporaryDirectory() as temp:
-            path = Path(temp) / 'doom.wad'
+            path = Path(temp) / 'doomkex.wad'
             make_wad(path, definition.must_contain)
             repository = Repository()
             self.assertTrue(scan_game_file(path, repository))

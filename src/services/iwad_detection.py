@@ -31,7 +31,15 @@ def wad_entries(path):
 
 def detect_wad(path, catalog=None):
     entries = wad_entries(path)
+    filename = Path(path).name.lower()
     for definition in (catalog or bundled_catalog()).definitions:
+        # The official Doom rules can match ordinary map packs, especially the
+        # Doom II rule whose only required lump is MAP01.
+        if (definition.name.startswith(('DOOM:', 'DOOM 2:')) or
+                definition.name in ('The Ultimate DOOM', 'DOOM Registered', 'DOOM Shareware')):
+            expected = definition.filename or 'doom1.wad'  # Shareware has no IWADName.
+            if filename != expected.lower():
+                continue
         if set(definition.must_contain).issubset(entries):
             logging.getLogger(__name__).debug("Identified %s as %s", path, definition.name)
             return definition
