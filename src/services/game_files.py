@@ -2,11 +2,47 @@
 from pathlib import Path
 import zlib
 import data
+from services.iwad_detection import detect_wad
+
+
+# IWADINFO distinguishes editions that share a legacy library identity.
+# Keep that identity for saved selections and modpack references.
+_IWAD_LEGACY_HINTS = {
+    'doombfg.wad': 'doom.wad',
+    'doomkex.wad': 'doom.wad',
+    'doomunity.wad': 'doom.wad',
+    'doomxbox.wad': 'doom.wad',
+    'doom2bfg.wad': 'doom2.wad',
+    'doom2kex.wad': 'doom2.wad',
+    'doom2unity.wad': 'doom2.wad',
+    'doom2xbox.wad': 'doom2.wad',
+    'tntkex.wad': 'tnt.wad',
+    'tntunity.wad': 'tnt.wad',
+    'plutoniakex.wad': 'plutonia.wad',
+    'plutoniaunity.wad': 'plutonia.wad',
+}
+
+
+def _catalog_game(path):
+    if path.suffix.lower() != '.wad':
+        return None
+    try:
+        definition = detect_wad(path)
+    except ValueError:
+        return None
+    if definition is None:
+        return None
+    # Preserve existing settings identities and runner compatibility.
+    hint = (definition.filename or '').lower()
+    game = data.games.get(_IWAD_LEGACY_HINTS.get(hint, hint))
+    return (game, definition.name) if game else None
+
 
 
 def scan_game_file(path, repository, cancelled=lambda: False):
     path = Path(path).resolve()
-    game = data.games.get(path.name.lower())
+    identified = _catalog_game(path)
+    game, label = identified if identified else (data.games.get(path.name.lower()), None)
     if game is None:
         return False
     crc = 0
@@ -22,5 +58,6 @@ def scan_game_file(path, repository, cancelled=lambda: False):
     name = release.get('name', game['name']) if release else f"{game['name']} vUnk-{checksum}"
     repository.save_game(game['name'], name,
                          version=release['version'] if release else checksum,
-                         crc=checksum, path=str(path), year=game['year'], game=game['game'])
+                         crc=checksum, path=str(path), year=game['year'],
+                         game=game['game'], label=label)
     return True

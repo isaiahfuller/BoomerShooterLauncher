@@ -84,9 +84,9 @@ Validated with 24 isolated-settings/offscreen tests, including export followed b
 editing, removal to empty, cancelled and saved renames, duplicate import filenames,
 and runner identity after display-label changes.
 
-Next: extract scanner identification with the IWADINFO task below. Launcher service
-extraction, controllers (including JSON workflow extraction), and widget moves remain
-pending.
+Next: complete the IWADINFO compatibility mappings and scanner workflow extraction.
+Launcher service extraction, controllers (including JSON workflow extraction), and
+widget moves remain pending.
 
 ## Purpose
 
@@ -222,7 +222,21 @@ A Qt table model is a presentation adapter for the library records, not the enti
 
 ## Planned task: adopt UZDoom IWADINFO for game identification
 
-Status: proposed; no IWADINFO parser or detector has been implemented.
+Status: WAD identification slice implemented. A pinned offline IWADINFO catalog is
+parsed into ordered definitions. A bounds-checked WAD directory reader matches
+`MustContain` rules for manual and Steam scans. Definitions whose filename hint
+maps to an existing library game use the existing settings identity; the previous
+filename and CRC method remains a fallback when no supported content mapping is
+available. The matched IWADINFO `Name` is saved as a display label and shown in
+the game list and version picker. Explicit edition aliases map KEX, Unity, BFG,
+and Xbox WAD hints to existing Doom, Doom II, TNT, and Plutonia identities;
+existing game and release keys remain unchanged
+for remembered selections and modpacks. CRC version metadata and blacklist checks
+still run for both methods.
+Unsupported upstream games, ZIP based IWADs, embedded definitions, companion
+requirements, and load ordering remain pending. Manual directory scans now use a
+Qt worker and GUI-thread signals for progress, refresh, and cleanup; broader
+scanner workflow extraction and launcher service extraction remain pending.
 
 Replace the game-identification portion of `data.games` with definitions from
 [UZDoom's `wadsrc_extra/static/iwadinfo.txt`](https://github.com/UZDoom/UZDoom/blob/trunk/wadsrc_extra/static/iwadinfo.txt).

@@ -1,65 +1,84 @@
-"""Scans files for known games"""
-import os
+"""Choose game files and coordinate background directory scans."""
 import logging
-import threading
-from threading import Thread
+import os
+
+from PySide6 import QtCore, QtGui, QtWidgets
+
 from repositories.settings_repository import SettingsRepository
-from PySide6 import QtGui, QtWidgets
 from services.game_files import scan_game_file
 
+
+FILE_TYPES = ('.wad', '.pk3', '.ipk3')
+
+
+class DirectoryScanWorker(QtCore.QThread):
+    """Scan files without touching widgets from the worker thread."""
+    progress = QtCore.Signal(str)
+
+    def __init__(self, directory, parent=None):
+        super().__init__(parent)
+        self.directory = directory
+
+    def run(self):
+        repository = SettingsRepository()
+        logger = logging.getLogger('Game Scanner')
+        for parent, _, names in os.walk(self.directory):
+            if self.isInterruptionRequested():
+                return
+            for name in names:
+                if self.isInterruptionRequested():
+                    return
+                if not name.lower().endswith(FILE_TYPES):
+                    continue
+                path = os.path.realpath(os.path.join(parent, name))
+                self.progress.emit(f'Scanning games... ({path})')
+                try:
+                    scan_game_file(path, repository, self.isInterruptionRequested)
+                except (OSError, ValueError):
+                    logger.exception('Failed to scan file %s', path)
+
+
 class GameScanner(QtWidgets.QFileDialog):
-    """File chooser"""
+    """File chooser and owner of the manual scan workflow."""
     def __init__(self, parent):
         super().__init__(parent=parent)
         self.refresh = None
         self.status = parent.status
         self.clearStatus = parent.clearStatus
-        self.logger = logging.getLogger("Game Scanner")
-        self.timer = None
+        self.logger = logging.getLogger('Game Scanner')
         self.repository = SettingsRepository()
-        self.fileTypes = ("wad", "pk3", "ipk3")
-        # self.setFileMode(QtWidgets.QFileDialog.ExistingFiles)
         self.setFileMode(QtWidgets.QFileDialog.Directory)
-        # self.setNameFilter("Game files (*.wad, *.pk3, *.ipk3)")
 
     def directoryCrawl(self, fileName, tableRefresh):
-        """Enumerate files and directories"""
+        """Scan a file or directory and refresh after background work ends."""
         self.refresh = tableRefresh
-        self.logger.info(f"Scanning directory {fileName}")
+        self.logger.info('Scanning %s', fileName)
         if os.path.isdir(fileName):
-            self.timer = threading.Timer(0.1, self.refresh)
-            self.timer.start()
-            t = Thread(target=self.directoryThread, args=(fileName,))
-            t.daemon = True
-            t.start()
+            owner = self.parent()
+            worker = DirectoryScanWorker(fileName, owner)
+            owner.directoryScanners.append(worker)
+            worker.progress.connect(self.status.showMessage)
+            worker.finished.connect(tableRefresh)
+            worker.finished.connect(self.clearStatus)
+            worker.finished.connect(lambda: owner.directoryScanners.remove(worker))
+            worker.finished.connect(worker.deleteLater)
+            worker.start()
         else:
             self.individualFile(fileName)
         self.close()
 
-    def directoryThread(self, fileName):
-        """Enumerate files and directories"""
-        for (dirpath, dirnames, filenames) in os.walk(fileName): # pylint: disable=unused-variable
-            for file in filenames:
-                if file.lower().endswith(self.fileTypes):
-                    self.timer.cancel()
-                    self.logger.debug(f"Scanning {file}")
-                    self.individualFile(os.path.join(dirpath, file))
-                    self.timer = threading.Timer(0.1, self.refresh)
-                    self.timer.start()
-        self.clearStatus()
-        self.refresh()
-
     def individualFile(self, fileName):
-        """Scans file crc"""
+        """Scan one selected file on the GUI thread."""
         fileName = os.path.realpath(fileName)
-        self.status.showMessage(f"Scanning games... ({fileName})")
+        self.status.showMessage(f'Scanning games... ({fileName})')
         try:
-            scan_game_file(fileName, self.repository)
-        except Exception:
-            self.logger.exception("Failed to scan file %s", fileName)
+            return scan_game_file(fileName, self.repository)
+        except (OSError, ValueError):
+            self.logger.exception('Failed to scan file %s', fileName)
+            return False
 
-    def closeEvent(self, arg__1: QtGui.QCloseEvent) -> None:
-        """Releases memory on close"""
-        self.refresh()
+    def closeEvent(self, event: QtGui.QCloseEvent) -> None:
+        if self.refresh is not None:
+            self.refresh()
         self.deleteLater()
-        return super().closeEvent(arg__1)
+        return super().closeEvent(event)

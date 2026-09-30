@@ -70,6 +70,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.steamScanAction = fileToolbar.addAction(
             "Find Steam Games", self.scanSteamGames)
         self.steamScanner = None
+        self.directoryScanners = []
         fileToolbar.addAction(listIcon, "&New Modpack", self.showModWindow)
         fileToolbar.addAction(loadIcon, "&Import Modpack", self.importModpack)
 
@@ -215,7 +216,8 @@ class MainWindow(QtWidgets.QMainWindow):
             )
             self.currentVersions.extend(version.name for version in versions)
             for version in versions:
-                self.versionCombobox.addItem(version.name, version)
+                label = f"{version.display_name} — {version.path}" if version.path else version.display_name
+                self.versionCombobox.addItem(label, version)
             self.versionCombobox.adjustSize()
             self.versionCombobox.setEnabled(bool(versions))
             self.logger.debug(f"\"{selection_name}\" versions: {self.currentVersions}")
@@ -331,6 +333,9 @@ class MainWindow(QtWidgets.QMainWindow):
         if self.steamScanner is not None:
             self.steamScanner.requestInterruption()
             self.steamScanner.wait()
+        for worker in self.directoryScanners:
+            worker.requestInterruption()
+            worker.wait()
         self.writeSettings()
         self.discord.clear()
         return super().closeEvent(event)

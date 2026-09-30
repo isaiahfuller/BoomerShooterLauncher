@@ -98,14 +98,14 @@ class SettingsWorkflowTests(unittest.TestCase):
                 window.gameList.selectRow(0)
                 assert window.runnerCombobox.currentText() == 'UZDoom'
                 assert window.runnerCombobox.isEnabled()
-                assert window.versionCombobox.currentText() == 'Registered'
+                assert window.versionCombobox.currentText() == 'Registered — /games/doom.wad'
                 repo.save_selection('The Ultimate Doom', 'Removed port', 'Removed release')
                 window.getRunners()
                 window.getVersions()
                 self.assertEqual(window.currentRunners, ['UZDoom'])
                 self.assertEqual(window.currentVersions, ['Registered'])
                 self.assertEqual(window.runnerCombobox.currentText(), 'UZDoom')
-                self.assertEqual(window.versionCombobox.currentText(), 'Registered')
+                self.assertEqual(window.versionCombobox.currentText(), 'Registered — /games/doom.wad')
                 with patch.object(GameLauncher, 'runGame') as launch:
                     window.launchGame()
                     launch.assert_called_once_with('Doom', '/games/doom.wad', 'UZDoom', [])

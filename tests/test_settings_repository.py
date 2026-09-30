@@ -94,6 +94,18 @@ class SettingsRepositoryTests(unittest.TestCase):
         self.assertEqual(raw.value("Runners/Custom Port/path"), "/ports/custom port")
         self.assertEqual(raw.value("Games/Doom/Last Version"), "Registered")
 
+    def test_iwadinfo_label_is_display_only(self):
+        self.repository.save_game("Doom", "The Ultimate Doom", version="1.9ud",
+                                  crc="bf0eaac0", path="/games/doom.wad",
+                                  year=1993, game="Doom", label="The Ultimate DOOM")
+        self.repository.save_selection("Doom", "UZDoom", "The Ultimate Doom")
+        record = SettingsRepository(self.settings).library().games[0]
+        self.assertEqual(record.name, "Doom")
+        self.assertEqual(record.versions[0].name, "The Ultimate Doom")
+        self.assertEqual(record.versions[0].display_name, "The Ultimate DOOM")
+        self.assertEqual(self.repository.last_selection("Doom"),
+                         ("UZDoom", "The Ultimate Doom"))
+
     def test_modpack_order_shrinking_and_empty_array(self):
         files = [{"name": name, "path": f"/mods/{name}", "source": ""}
                  for name in ("b.pk3", "a.wad")]

@@ -2,7 +2,6 @@
 import logging
 import os
 from PySide6 import QtCore
-import data
 from repositories.settings_repository import SettingsRepository
 from services.game_files import scan_game_file
 from services.steam import installed_game_directories
@@ -35,7 +34,7 @@ class SteamScanner(QtCore.QThread):
                         if self.isInterruptionRequested():
                             return
                         path = os.path.realpath(os.path.join(parent, name))
-                        if name.lower() not in data.games or path in seen:
+                        if not name.lower().endswith(('.wad', '.pk3', '.ipk3')) or path in seen:
                             continue
                         seen.add(path)
                         try:

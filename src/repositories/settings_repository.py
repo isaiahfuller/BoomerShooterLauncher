@@ -80,6 +80,8 @@ class SettingsRepository:
                             key: settings.value(f"{name}/{key}")
                             for key in ("version", "crc", "path")
                         }
+                        if settings.contains(f"{name}/label"):
+                            releases[name]["label"] = settings.value(f"{name}/label")
                     result[base] = {
                         "game": settings.value("game"),
                         "year": settings.value("year"),
@@ -90,10 +92,14 @@ class SettingsRepository:
                     settings.endGroup()
             return result
 
-    def save_game(self, base, name, *, version, crc, path, year, game):
+    def save_game(self, base, name, *, version, crc, path, year, game, label=None):
         with self._session(f"Games/{base}", write=True) as settings:
             for key, value in (("version", version), ("crc", crc), ("path", path)):
                 settings.setValue(f"{name}/{key}", value)
+            if label is None:
+                settings.remove(f"{name}/label")
+            else:
+                settings.setValue(f"{name}/label", label)
             settings.setValue("year", year)
             settings.setValue("game", game)
 
