@@ -1,6 +1,5 @@
 """A game launcher for old FPS games"""
 import sys
-import os
 import logging
 import platform
 import json
@@ -15,6 +14,7 @@ from steam_scanner import SteamScanner
 from runner_view import RunnerView
 from mods_view import ModsView
 from launcher import GameLauncher
+from services.launch import LaunchRequest
 from import_view import ModsImport
 from theme import Theme
 from first_run_view import FirstRun
@@ -49,7 +49,6 @@ class MainWindow(QtWidgets.QMainWindow):
         self.currentVersions = []
         self.runnerText = ""
         self.game_running = False
-        self.originalPath = ""
 
         iconColor = "grey"
         plusIcon = qta.icon('fa5s.plus', color=iconColor)
@@ -227,50 +226,76 @@ class MainWindow(QtWidgets.QMainWindow):
             self.versionCombobox.addItem("Versions")
 
     def launchGame(self):
-        """Launch currently selected game with currently selected source port"""
-        runnerList = RunnerView(self)
-        version = self.versionCombobox.currentData()
-        version_text = version.name if version else ""
-        runner = self.runnerCombobox.currentData()
-        self.runnerText = runner.name if runner else ""
-        self.process = GameLauncher(self)
-        self.process.finished.connect(self.clearStatus)
-        self.process.finished.connect(self.gameClosed)
+        """Resolve the selected records and start a source port."""
         try:
+            if self.process is not None and self.process.state() != QtCore.QProcess.NotRunning:
+                raise RuntimeError("A game is already running")
             record = self.gameList.selected_record
             if record is None:
                 raise ValueError("Select a game first")
-            is_modpack = isinstance(record, Modpack)
-            selection_name = record.name
-            self.repository.save_selection(
-                selection_name, self.runnerText, version_text, modpack=is_modpack)
             version = self.versionCombobox.currentData()
-            if version is None:
+            if version is None or not version.path:
                 raise ValueError("Select an installed game version")
-            game = version.path
-            if len(self.currentRunners) == 0:
-                runnerList.showWindow(self.game)
-            else:
-                self.originalPath = os.getcwd()
-                if is_modpack:
-                    self.process.runGame(
-                        self.game, game, self.runnerText, [file.path for file in record.files])
-                else:
-                    self.process.runGame(self.game, game, self.runnerText, [])
-                self.discordDetails = f"Playing {self.gameList.game} with {self.runnerText}"
-                self.discordState = version_text
-                self.game_running = True
-                self.updateStatus()
-                self.status.showMessage(
-                    f"{self.discordDetails} ({version_text})")
-        except Exception as e:  # pylint: disable=broad-except
-            self.logger.exception(e)
-            self.logger.error("Failed to launch game")
-            errorWindow = QtWidgets.QErrorMessage(self)
-            errorWindow.showMessage(f"Failed to launch game ({e})")
-        finally:
-            self.process = None
-            runnerList = None
+            if not self.currentRunners:
+                RunnerView(self).showWindow(self.game)
+                return
+            runner = self.runnerCombobox.currentData()
+            if runner is None or not runner.path:
+                raise ValueError("Select a source port")
+            is_modpack = isinstance(record, Modpack)
+            mod_paths = tuple(file.path for file in record.files) if is_modpack else ()
+            if any(not path for path in mod_paths):
+                raise ValueError("A modpack file has no local path")
+            request = LaunchRequest(record.name, version.path, runner.name,
+                                    runner.path, mod_paths)
+            self.runnerText = runner.name
+            self.repository.save_selection(record.name, runner.name, version.name,
+                                           modpack=is_modpack)
+            if self.process is not None:
+                self.process.deleteLater()
+            process = GameLauncher(self)
+            self.process = process
+            process.finished.connect(
+                lambda code, status: self._launch_finished(process, code, status))
+            process.errorOccurred.connect(
+                lambda error: self._launch_error(process, error))
+            process.runGame(request)
+            self.discordDetails = f"Playing {record.name} with {runner.name}"
+            self.discordState = version.name
+            self.game_running = True
+            self.updateStatus()
+            self.status.showMessage(f"{self.discordDetails} ({version.name})")
+        except Exception as error:  # pylint: disable=broad-except
+            self.logger.exception("Failed to launch game")
+            if self.process is not None and self.process.state() == QtCore.QProcess.NotRunning:
+                self.process.deleteLater()
+                self.process = None
+            if not self.game_running:
+                self.clearStatus()
+            error_window = QtWidgets.QErrorMessage(self)
+            error_window.showMessage(f"Failed to launch game ({error})")
+
+    def _launch_finished(self, process, exit_code, exit_status):
+        if process is not self.process:
+            return
+        self.clearStatus()
+        if exit_code != 0 or exit_status != QtCore.QProcess.NormalExit:
+            error_window = QtWidgets.QErrorMessage(self)
+            error_window.showMessage(
+                f"{self.runnerText} exited with code {exit_code}. "
+                "Check the source port and game version if modded.")
+        self.process = None
+        process.deleteLater()
+
+    def _launch_error(self, process, error):
+        if process is not self.process or error != QtCore.QProcess.FailedToStart:
+            return
+        message = process.errorString()
+        self.clearStatus()
+        error_window = QtWidgets.QErrorMessage(self)
+        error_window.showMessage(f"Failed to start {self.runnerText}: {message}")
+        self.process = None
+        process.deleteLater()
 
     def showModWindow(self):
         """Creates and displays the mod editor window"""
@@ -324,10 +349,6 @@ class MainWindow(QtWidgets.QMainWindow):
         """Updates status"""
         self.discord.update(self.discordState, self.discordDetails)
 
-    def gameClosed(self):
-        """Changes working directory after game closes"""
-        os.chdir(self.originalPath)
-
     def closeEvent(self, event: QtGui.QCloseEvent):
         """Saves settings before closing"""
         if self.steamScanner is not None:
@@ -336,6 +357,12 @@ class MainWindow(QtWidgets.QMainWindow):
         for worker in self.directoryScanners:
             worker.requestInterruption()
             worker.wait()
+        process = self.process
+        if process is not None and process.state() != QtCore.QProcess.NotRunning:
+            process.terminate()
+            if not process.waitForFinished(3000):
+                process.kill()
+                process.waitForFinished(3000)
         self.writeSettings()
         self.discord.clear()
         return super().closeEvent(event)

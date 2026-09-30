@@ -85,8 +85,9 @@ editing, removal to empty, cancelled and saved renames, duplicate import filenam
 and runner identity after display-label changes.
 
 Next: complete the IWADINFO compatibility mappings and scanner workflow extraction.
-Launcher service extraction, controllers (including JSON workflow extraction), and
-widget moves remain pending.
+The launcher service now accepts an explicit request and owns command construction
+and process setup. Launch coordination, other controllers (including JSON workflow
+extraction), and widget moves remain pending.
 
 ## Purpose
 
@@ -207,13 +208,13 @@ def launch(self, request):
 
 A launch request should contain the resolved executable, game file, ordered mod files, runner information, and save directory. Command construction must preserve runner-specific arguments, including save-directory flags.
 
-This removes the current dependency on `self.parent().gameList.game`. Using `QProcess.setWorkingDirectory()` also avoids changing the working directory of the entire application with `os.chdir()`. Report both failure to start and unsuccessful process exits to the controller.
+The launch service no longer depends on `self.parent().gameList.game` or changes the application working directory. It uses `QProcess.setWorkingDirectory()`. The main window currently handles start failures and unsuccessful exits; moving that coordination into a controller remains pending.
 
 ## Incremental migration
 
 1. **Centralize persistence — implemented.** Introduce the settings repository and route existing settings access through it. Preserve the stored format and platform-specific configuration names. Keep the current widgets in place.
 2. **Introduce explicit models — initial slice implemented.** Define game, installed-version, runner, and modpack objects. Move static metadata into the catalog and compatibility logic into the library. Replace positional record access incrementally. Implement the IWADINFO catalog task below alongside scanner extraction.
-3. **Extract scanning and launching.** Separate the file picker from scanning. Give the launcher explicit inputs, remove parent-widget access, and report outcomes through signals. Preserve existing command arguments and save locations.
+3. **Extract scanning and launching — in progress.** Manual directory scanning uses a Qt worker with GUI-thread callbacks. The launcher accepts explicit inputs, has no parent-widget or settings access, uses a process working directory, and reports outcomes through Qt signals. Finish scanner workflow extraction and controller ownership.
 4. **Extract controllers.** Move selection, runner/version population, launch coordination, and modpack workflows out of widgets. Connect user-intent signals to controllers and send display-ready results back to views.
 5. **Move modules into packages.** Reduce `main.py` to application setup and component wiring. Update imports and build configuration as files move. Retain references to controllers, dialogs, and asynchronous services for their required lifetimes.
 6. **Optionally adopt Qt model/view tables.** Keep `QTableWidget` during the initial refactor. Later, replace it with `QTableView` and a `QAbstractTableModel` adapter if that simplifies refreshes and selection handling.
