@@ -115,7 +115,11 @@ class SettingsWorkflowTests(unittest.TestCase):
                              ['/mods/first.pk3', '/mods/second.wad'])
             with patch('repositories.settings_repository.create_settings', factory), \
                  patch.object(main, 'Theme'), patch.object(main, 'Discord'):
-                window = main.MainWindow()
+                with patch.object(main.ScanController, 'scan_steam') as startup_scan:
+                    window = main.MainWindow()
+                    startup_scan.assert_called_once_with()
+                assert not hasattr(window, 'steamScanAction')
+                assert all('Steam Games' not in action.text() for action in window.actions())
                 assert window.gameList.rowCount() == 2
                 window.gameList.selectRow(0)
                 assert window.runnerCombobox.currentText() == 'UZDoom'
@@ -166,7 +170,6 @@ class SettingsWorkflowTests(unittest.TestCase):
                     worker = window.steamScanner
                     window.scanSteamGames()
                     assert window.steamScanner is worker
-                    assert not window.steamScanAction.isEnabled()
                     loop = QtCore.QEventLoop()
                     worker.finished.connect(loop.quit)
                     timeout = QtCore.QTimer()
@@ -176,7 +179,6 @@ class SettingsWorkflowTests(unittest.TestCase):
                     loop.exec()
                     timeout.stop()
                     assert window.steamScanner is None
-                    assert window.steamScanAction.isEnabled()
                     assert '1 supported game files' in window.status.currentMessage()
                 window.writeSettings()
                 assert not repo.window_geometry().isEmpty()

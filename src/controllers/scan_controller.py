@@ -1,4 +1,5 @@
 """Own background scans and report results without accessing widgets."""
+
 from PySide6 import QtCore
 
 from scanner import DirectoryScanWorker
@@ -52,7 +53,7 @@ class ScanController(QtCore.QObject):
         worker.failed.connect(self._steam_failed)
         worker.finished.connect(self._steam_finished)
         self.steam_busy.emit(True)
-        self.progress.emit('Finding installed Steam games…')
+        self.progress.emit("Finding installed Steam games…")
         worker.start()
 
     @QtCore.Slot(int, int, int)

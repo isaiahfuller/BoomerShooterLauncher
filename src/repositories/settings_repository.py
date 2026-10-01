@@ -5,8 +5,8 @@ escape an operation or get shared between the scanner and the GUI thread.
 Pass a factory returning isolated QSettings instances when testing.
 """
 
-from contextlib import contextmanager
 import platform
+from contextlib import contextmanager
 
 from PySide6 import QtCore
 
@@ -46,15 +46,24 @@ class SettingsRepository:
         from models.records import Game, InstalledVersion, ModFile, Modpack, Runner
 
         games = tuple(
-            Game(name, record["game"], record["year"], tuple(
-                InstalledVersion(release_name, **release)
-                for release_name, release in record["releases"].items()
-            ))
+            Game(
+                name,
+                record["game"],
+                record["year"],
+                tuple(
+                    InstalledVersion(release_name, **release)
+                    for release_name, release in record["releases"].items()
+                ),
+            )
             for name, record in self.games().items()
         )
-        runners = tuple(Runner(name, **record) for name, record in self.runners().items())
+        runners = tuple(
+            Runner(name, **record) for name, record in self.runners().items()
+        )
         modpacks = tuple(
-            Modpack(name, record["base"], tuple(ModFile(**file) for file in record["files"]))
+            Modpack(
+                name, record["base"], tuple(ModFile(**file) for file in record["files"])
+            )
             for name, record in self.modpacks().items()
         )
         return Library(games, runners, modpacks)
@@ -106,8 +115,10 @@ class SettingsRepository:
     def runners(self):
         with self._session("Runners") as settings:
             return {
-                name: {key: settings.value(f"{name}/{key}")
-                       for key in ("path", "executable")}
+                name: {
+                    key: settings.value(f"{name}/{key}")
+                    for key in ("path", "executable")
+                }
                 for name in settings.childGroups()
             }
 
@@ -132,8 +143,12 @@ class SettingsRepository:
                     try:
                         for index in range(size):
                             settings.setArrayIndex(index)
-                            files.append({key: settings.value(key)
-                                          for key in ("name", "path", "source")})
+                            files.append(
+                                {
+                                    key: settings.value(key)
+                                    for key in ("name", "path", "source")
+                                }
+                            )
                     finally:
                         settings.endArray()
                     result[name] = {"name": name, "base": base, "files": files}
@@ -158,6 +173,7 @@ class SettingsRepository:
     def save_modpack_record(self, pack):
         """Persist an immutable draft using the existing array schema."""
         from dataclasses import asdict
+
         self.save_modpack(pack.name, pack.base, [asdict(file) for file in pack.files])
 
     def remove_modpack(self, name):

@@ -1,25 +1,29 @@
 """A game launcher for old FPS games"""
-import sys
+
+import json
 import logging
 import platform
-import json
-from models.records import Modpack
-from controllers.launch_controller import LaunchController
-from repositories.settings_repository import SettingsRepository
-from PySide6 import QtCore, QtWidgets, QtGui
+import sys
+
 import qtawesome as qta
-from discord import Discord
-from games_view import GamesView
+from PySide6 import QtCore, QtGui, QtWidgets
+
+from controllers.launch_controller import LaunchController
 from controllers.scan_controller import ScanController
-from runner_view import RunnerView
-from mods_view import ModsView
-from import_view import ModsImport
-from theme import Theme
+from discord import Discord
 from first_run_view import FirstRun
+from games_view import GamesView
+from import_view import ModsImport
+from models.records import Modpack
+from mods_view import ModsView
+from repositories.settings_repository import SettingsRepository
+from runner_view import RunnerView
+from theme import Theme
 
 
 class MainWindow(QtWidgets.QMainWindow):
     """Main launcher window"""
+
     launchRequested = QtCore.Signal()
 
     def __init__(self):
@@ -54,11 +58,11 @@ class MainWindow(QtWidgets.QMainWindow):
         self.game_running = False
 
         iconColor = "grey"
-        plusIcon = qta.icon('fa5s.plus', color=iconColor)
-        codeIcon = qta.icon('fa5s.code', color=iconColor)
-        listIcon = qta.icon('fa5s.list-ol', color=iconColor)
-        loadIcon = qta.icon('fa5s.file-download', color=iconColor)
-        refreshIcon = qta.icon('fa5s.sync-alt', color=iconColor)
+        plusIcon = qta.icon("fa5s.plus", color=iconColor)
+        codeIcon = qta.icon("fa5s.code", color=iconColor)
+        listIcon = qta.icon("fa5s.list-ol", color=iconColor)
+        loadIcon = qta.icon("fa5s.file-download", color=iconColor)
+        refreshIcon = qta.icon("fa5s.sync-alt", color=iconColor)
 
         self.gameList.setHorizontalHeaderLabels(["", "Name", "Files"])
 
@@ -69,34 +73,28 @@ class MainWindow(QtWidgets.QMainWindow):
 
         fileToolbar.addAction(codeIcon, "&Manage Ports", self.showRunnerList)
         fileToolbar.addAction(plusIcon, "&Add Games", self.gameScanner)
-        self.steamScanAction = fileToolbar.addAction(
-            "Find Steam Games", self.scanSteamGames)
         self.scanController = ScanController(self.repository, self)
         self.scanController.progress.connect(self.status.showMessage)
         self.scanController.library_changed.connect(self.gameList.refresh)
         self.scanController.manual_finished.connect(
-            lambda: self.status.showMessage("Scan complete."))
+            lambda: self.status.showMessage("Scan complete.")
+        )
         self.scanController.steam_completed.connect(self.steamScanCompleted)
         self.scanController.steam_failed.connect(self.steamScanFailed)
-        self.scanController.steam_busy.connect(
-            lambda busy: self.steamScanAction.setEnabled(not busy))
         fileToolbar.addAction(listIcon, "&New Modpack", self.showModWindow)
         fileToolbar.addAction(loadIcon, "&Import Modpack", self.importModpack)
 
         fileToolbar.setToolButtonStyle(QtCore.Qt.ToolButtonTextUnderIcon)
         if self.logger.level == logging.DEBUG:
-            fileToolbar.addAction(refreshIcon, "&Refresh",
-                                  self.gameList.refresh)
+            fileToolbar.addAction(refreshIcon, "&Refresh", self.gameList.refresh)
 
         self.runnerCombobox = QtWidgets.QComboBox()
         self.runnerCombobox.addItem("Select a game first")
         self.versionCombobox = QtWidgets.QComboBox()
         self.versionCombobox.addItem("Versions")
         self.launchButton = QtWidgets.QPushButton("Launch", self)
-        self.runnerCombobox.setSizeAdjustPolicy(
-            QtWidgets.QComboBox.AdjustToContents)
-        self.versionCombobox.setSizeAdjustPolicy(
-            QtWidgets.QComboBox.AdjustToContents)
+        self.runnerCombobox.setSizeAdjustPolicy(QtWidgets.QComboBox.AdjustToContents)
+        self.versionCombobox.setSizeAdjustPolicy(QtWidgets.QComboBox.AdjustToContents)
         self.runnerCombobox.setEnabled(False)
         self.versionCombobox.setEnabled(False)
 
@@ -119,6 +117,8 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self.setCentralWidget(self.gameList)
         self.setAcceptDrops(True)
+
+        self.scanController.scan_steam()
 
     def writeSettings(self):
         """Write window geometry to registry"""
@@ -173,11 +173,14 @@ class MainWindow(QtWidgets.QMainWindow):
             self.game = game
             is_modpack = isinstance(record, Modpack)
             selection_name = record.name
-            lastRunner, _ = self.repository.last_selection(selection_name, modpack=is_modpack)
-            runners = self.repository.library().compatible_runners(game, preferred=lastRunner)
+            lastRunner, _ = self.repository.last_selection(
+                selection_name, modpack=is_modpack
+            )
+            runners = self.repository.library().compatible_runners(
+                game, preferred=lastRunner
+            )
             self.currentRunners.extend(runner.name for runner in runners)
-            self.logger.debug(
-                f"Compatible runners for \"{game}\": {self.currentRunners}")
+            self.logger.debug(f'Compatible runners for "{game}": {self.currentRunners}')
             if len(self.currentRunners) == 0:
                 self.runnerCombobox.adjustSize()
                 self.runnerCombobox.setEnabled(False)
@@ -201,17 +204,23 @@ class MainWindow(QtWidgets.QMainWindow):
         if record is not None:
             is_modpack = isinstance(record, Modpack)
             selection_name = record.name
-            _, lastVersion = self.repository.last_selection(selection_name, modpack=is_modpack)
+            _, lastVersion = self.repository.last_selection(
+                selection_name, modpack=is_modpack
+            )
             versions = self.repository.library().installed_versions(
                 selection_name, modpack=is_modpack, preferred=lastVersion
             )
             self.currentVersions.extend(version.name for version in versions)
             for version in versions:
-                label = f"{version.display_name} — {version.path}" if version.path else version.display_name
+                label = (
+                    f"{version.display_name} — {version.path}"
+                    if version.path
+                    else version.display_name
+                )
                 self.versionCombobox.addItem(label, version)
             self.versionCombobox.adjustSize()
             self.versionCombobox.setEnabled(bool(versions))
-            self.logger.debug(f"\"{selection_name}\" versions: {self.currentVersions}")
+            self.logger.debug(f'"{selection_name}" versions: {self.currentVersions}')
         else:
             self.versionCombobox.adjustSize()
             self.versionCombobox.setEnabled(False)
@@ -277,7 +286,8 @@ class MainWindow(QtWidgets.QMainWindow):
     def dropEvent(self, event):
         """Scans files and folders dropped onto the window as games"""
         self.scanController.scan_paths(
-            [url.toLocalFile() for url in event.mimeData().urls()])
+            [url.toLocalFile() for url in event.mimeData().urls()]
+        )
         return super().dropEvent(event)
 
     def clearStatus(self):
