@@ -1,18 +1,20 @@
 """
 To build:
 python setup.py build
-AFAIK this still needs python 3.10
 """
+import sys
+
 import cx_Freeze
 
-exe = [cx_Freeze.Executable("main.py", base="Win32GUI", targetName="BSL.exe")]  # <-- HERE
+target_name = "boomershooterlauncher" if sys.platform.startswith("linux") else "BSL.exe"
+exe = [cx_Freeze.Executable("src/main.py", base="gui", target_name=target_name)]  # <-- HERE
 
 cx_Freeze.setup(
     name="BSL",
     version="1.1",
     options={"build_exe": {
         "packages": ["models", "views", "controllers", "repositories", "services"],
-        "include_files": [("models/assets/iwadinfo.txt", "lib/models/assets/iwadinfo.txt")],
+        "include_files": [("src/models/assets/iwadinfo.txt", "lib/models/assets/iwadinfo.txt")],
     }},
     executables=exe
 )

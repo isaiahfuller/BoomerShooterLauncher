@@ -21,12 +21,12 @@ is in an undiscovered location, use **Add Games** to select its game folder manu
 </details>
 ------------
 
-**Running** - Requires Python 3.10 or higher
+**Running** - Requires Python 3.14 or higher
 
     pip install -r requirements.txt
     python main.py
 
-**Building** - Requires Python 3.10
+**Building** - Requires Python 3.14
 
     pip install -r requirements.txt
     python setup.py build
