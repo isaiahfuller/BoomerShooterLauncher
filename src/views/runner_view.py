@@ -1,22 +1,21 @@
 """Manage source ports"""
-import os
-from pathlib import Path
 import logging
 import webbrowser
-import shutil
-from models.records import Runner
+from controllers.runner_controller import RunnerController
 from repositories.settings_repository import SettingsRepository
 from PySide6 import QtCore, QtWidgets, QtGui
-import data
 
 class RunnerView(QtWidgets.QMainWindow):
     """Source port manager window and functions"""
+    closed = QtCore.Signal()
     def __init__(self, parent):
         super().__init__(parent=parent)
         self.setWindowModality(QtCore.Qt.ApplicationModal)
         self.logger = logging.getLogger("Runner Editor")
         self.logger.info("Opened")
-        self.repository = SettingsRepository()
+        self.repository = getattr(parent, "repository", None) or SettingsRepository()
+        self.controller = RunnerController(self.repository, self)
+        self.controller.failed.connect(self.showError)
 
         self.boxLayout = QtWidgets.QVBoxLayout()
         self.openedFromMenu = False
@@ -91,21 +90,12 @@ class RunnerView(QtWidgets.QMainWindow):
         self.show()
 
     def builder(self, game):
-        """Builds list of source ports"""
+        """Render the controller's source-port choices."""
+        self.controller.repository = self.repository
         self.runnerList.clear()
         self.game = game
-        if game == "all":
-            allRunners = self.repository.library().runners
-            for i in allRunners:
-                self.addRunnerItem(i, installed=True)
-            for i in data.runners:
-                if i not in {runner.name for runner in allRunners}:
-                    self.addRunnerItem(Runner(i, None, data.runners[i]["executable"]))
-        else:
-            for i in data.runners: # pylint: disable=consider-using-dict-items
-                if game in data.runners[i]["games"]:
-                    if not self.runnerList.findItems(i, QtCore.Qt.MatchExactly):
-                        self.addRunnerItem(Runner(i, None, data.runners[i]["executable"]))
+        for runner, installed in self.controller.choices(game):
+            self.addRunnerItem(runner, installed)
         self.addRunnerItem(None)
         self.updateText()
 
@@ -116,36 +106,29 @@ class RunnerView(QtWidgets.QMainWindow):
         self.runnerList.addItem(item)
 
     def setRunner(self):
-        """Change current runner to selected"""
-        saved = next((runner for runner in self.repository.library().runners
-                      if runner.name == self.name), None)
-        self.url = None
-        if self.name == "Custom...":
-            self.executable = "*"
-            self.descriptionLabel.setText("Add a runner that isn't listed.")
-        elif self.name in data.runners:
-            runner = data.runners[self.name]
-            self.executable = runner["executable"]
-            self.descriptionLabel.setText(runner["description"])
-            self.url = runner["link"]
-        else:
-            self.executable = saved.executable if saved else self.name
-            self.descriptionLabel.setText("Custom runner.")
-
-        detected = shutil.which(self.executable) if self.executable != "*" else None
-        self.programPath.setEnabled(True)
-        self.browseButton.setEnabled(True)
-        self.programPath.setPlaceholderText("Not found on PATH — browse for a program")
-        # A saved override takes priority over automatic discovery.
-        self.programPath.setText(saved.path or "" if saved else (detected or ""))
+        """Render the selected runner's configuration."""
+        item = self.runnerList.currentItem()
+        record = item.data(QtCore.Qt.UserRole) if item else None
+        self.controller.select(record, custom=item is not None and record is None)
+        self.name = self.controller.name
+        self.executable = self.controller.executable
+        self.url = self.controller.url
+        selected = self.name is not None
+        self.descriptionLabel.setText(self.controller.description)
+        self.programPath.setEnabled(selected)
+        self.browseButton.setEnabled(selected)
+        self.programPath.setPlaceholderText(
+            "Not found on PATH — browse for a program" if selected
+            else "Select a runner to find its executable")
+        self.programPath.setText(self.controller.path)
         self.downloadButton.setEnabled(bool(self.url))
-        self.removeButton.setEnabled(saved is not None)
+        self.removeButton.setEnabled(self.controller.installed)
         self.updateSaveButton()
 
     def updateSaveButton(self):
-        """Enable saving once a runner and a location are supplied."""
-        self.selectInstalledButton.setEnabled(
-            self.name is not None and bool(self.programPath.text()))
+        """Submit path edits and render save availability."""
+        self.controller.change_path(self.programPath.text())
+        self.selectInstalledButton.setEnabled(self.controller.can_save)
 
     def browseProgram(self):
         """Choose an executable, including an override for an installed runner."""
@@ -159,53 +142,37 @@ class RunnerView(QtWidgets.QMainWindow):
         webbrowser.open(self.url)
 
     def updateText(self):
-        """Change name to currently selected source port"""
-        item = self.runnerList.currentItem()
-        if item is None:
-            self.name = None
-            self.programPath.clear()
-            self.programPath.setEnabled(False)
-            self.browseButton.setEnabled(False)
-            self.downloadButton.setEnabled(False)
-            self.removeButton.setEnabled(False)
-            return
-        runner = item.data(QtCore.Qt.UserRole)
-        self.name = runner.name if runner else "Custom..."
+        """Refresh configuration when the selection changes."""
         self.setRunner()
 
     def addToDb(self):
-        """Save the detected or user-selected executable location."""
-        if self.name is None or not self.programPath.text():
-            return
-        path = Path(self.programPath.text()).expanduser()
-        if not path.is_file() or not os.access(path, os.X_OK):
-            QtWidgets.QMessageBox.warning(
-                self, "Invalid program", "Choose an existing executable file.")
-            return
-        name = path.name if self.name == "Custom..." else self.name
-        try:
-            self.repository.save_runner(name, str(path.absolute()), self.executable)
-        except OSError as error:
-            self.logger.exception("Failed to save runner %s", name)
-            QtWidgets.QMessageBox.warning(self, "Unable to save runner", str(error))
+        """Save through the controller and refresh the displayed choices."""
+        record = self.controller.save()
+        if record is None:
             return
         self.builder(self.game)
         if not self.openedFromMenu:
             self.close()
         else:
-            matches = self.runnerList.findItems(f"{name} [installed]", QtCore.Qt.MatchExactly)
-            if matches:
-                self.runnerList.setCurrentItem(matches[0])
+            for row in range(self.runnerList.count()):
+                item = self.runnerList.item(row)
+                runner = item.data(QtCore.Qt.UserRole)
+                if runner is not None and runner.name == record.name:
+                    self.runnerList.setCurrentItem(item)
+                    break
 
     def removeRunner(self):
-        """Removes source port from registry and combo box"""
-        self.repository.remove_runner(self.name)
-        self.builder(self.game)
+        """Remove the selected record through the controller."""
+        if self.controller.remove():
+            self.builder(self.game)
+
+    def showError(self, title, message):
+        QtWidgets.QMessageBox.warning(self, title, message)
 
     def closeEvent(self, event: QtGui.QCloseEvent) -> None:
         """Refresh main window when closing"""
         self.runnerList.clear()
         self.openedFromMenu = False
-        self.parent().getRunners()
+        self.closed.emit()
         self.deleteLater()
         return super().closeEvent(event)

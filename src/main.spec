@@ -8,7 +8,7 @@ a = Analysis(
     ['main.py'],
     pathex=[],
     binaries=[],
-    datas=[],
+    datas=[('models/assets/iwadinfo.txt', 'models/assets')],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},

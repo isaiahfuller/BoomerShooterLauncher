@@ -10,7 +10,7 @@ from unittest.mock import patch
 from PySide6 import QtCore, QtWidgets
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'src'))
 import data
-from runner_view import RunnerView
+from views.runner_view import RunnerView
 from repositories.settings_repository import SettingsRepository
 
 
@@ -56,7 +56,7 @@ class RunnerViewTests(unittest.TestCase):
     def test_browse_overrides_detection_and_saved_override_wins(self):
         detected = self.program(self.executable)
         custom = self.program('custom port')
-        with patch('runner_view.shutil.which', return_value=str(detected)):
+        with patch('controllers.runner_controller.shutil.which', return_value=str(detected)):
             self.select(self.name)
             with patch.object(self.view.runnerDialog, 'getOpenFileName',
                               return_value=(str(custom), '')):
@@ -68,7 +68,7 @@ class RunnerViewTests(unittest.TestCase):
         self.assertEqual(self.repo.runners()[self.name]['path'], str(custom))
 
     def test_missing_path_cancel_and_invalid_file_do_not_save(self):
-        with patch('runner_view.shutil.which', return_value=None):
+        with patch('controllers.runner_controller.shutil.which', return_value=None):
             self.select(self.name)
         self.assertEqual(self.view.programPath.text(), '')
         self.assertFalse(self.view.selectInstalledButton.isEnabled())

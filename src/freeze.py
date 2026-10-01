@@ -16,7 +16,7 @@ try:
 except ImportError:
     get_qt_plugins_paths = None
 
-include_files = []
+include_files = [("models/assets/iwadinfo.txt", "lib/models/assets/iwadinfo.txt")]
 if get_qt_plugins_paths:
     # Inclusion of extra plugins (since cx_Freeze 6.8b2)
     # cx_Freeze imports automatically the following plugins depending of the
@@ -45,6 +45,7 @@ build_exe_options = {
     # exclude packages that are not really needed
     "excludes": ["tkinter", "unittest", "email", "http", "xml", "pydoc"],
     "include_files": include_files,
+    "packages": ["models", "views", "controllers", "repositories", "services"],
     "zip_include_packages": ["PySide6"],
 }
 

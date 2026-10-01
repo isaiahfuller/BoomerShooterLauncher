@@ -1,6 +1,31 @@
 # MVC refactor plan
 
-Status: persistence centralization and the initial domain-model slice are implemented. Remaining MVC migration is incremental.
+Status: core MVC implementation complete. Automated validation passes; manual GUI
+and frozen-build release checks remain outstanding.
+
+## Implemented: final view boundaries and presence ownership
+
+`LibraryController.refresh()` loads the library and publishes family-grouped records.
+`GamesView` renders supplied records, preserves selection by type and persisted name,
+and emits refresh and context-menu intents. It no longer constructs a repository or
+loads settings. Production dialogs share the window's repository; modpack actions
+receive explicit records, and importer/editor/runner refreshes use signals.
+Legacy table-parented modpack entry points remain as compatibility adapters.
+
+`PresenceController` owns the Discord timer, playing/idle state, updates, and
+idempotent shutdown. `MainWindow` wires workflow events and renders status messages;
+scan completion does not reset playing presence. QTableWidget remains intentional.
+
+Validation: 76 tests and 50 subtests pass with offscreen Qt, including controller-led
+refresh, record-identity restoration/removal, explicit context-menu records, shared
+repository use, and presence lifecycle. Python compilation and `git diff --check`
+pass. Manual interactive GUI smoke checks were not performed. Frozen builds could
+not be run because cx_Freeze and PyInstaller are not installed.
+
+IWADINFO edition labels remain display-only: saved identities, selections, modpack
+references and ordering are unchanged. Content-based KEX detection supports Steam's
+standard filenames; weak Xbox Doom II matches retain filename safeguards. Existing
+labels require rescanning, and stale false-positive entries are not auto-deleted.
 
 ## Implemented: QSettings repository
 
@@ -8,15 +33,16 @@ Status: persistence centralization and the initial domain-model slice are implem
 group, key, and array access. The main window, game list, runner editor, modpack
 editor/importer, scanner, and launcher use repository methods for persistence.
 Dictionary APIs remain for callers awaiting migration; the library adapter supplies
-domain records. Controllers remain a future step.
+domain records. Launch, scan, library selection, modpack, and runner controllers
+now own these workflow slices; module/package movement is implemented.
 
 The repository preserves the Windows organization/application names
 `Isaiah Fuller` / `Boomer Shooter Launcher` and the Linux names
 `boomershooterlauncher` / `config`, along with the existing native settings format
 and schema. Each operation creates a fresh settings instance, so scanning and UI
 operations do not share mutable settings group or array cursors. Writes sync before
-returning and report persistence errors. Scanner-to-widget threading behavior is
-unchanged and remains part of the service extraction stage.
+returning and report persistence errors. Controller-owned scan workers report
+results to widgets on the GUI thread.
 
 Modpack saves preserve file order and remembered selections, and clear obsolete
 file entries when a pack shrinks or becomes empty. Remembered runners are read
@@ -28,7 +54,7 @@ checks mock Discord, theme integration, and game process execution. Run from the
 repository root with the launcher dependencies installed:
 
 ```bash
-python -m unittest discover -s tests -v
+PYTHONPATH=src python -m unittest discover -s tests -v
 ```
 
 ## Implemented: initial domain models and library rules
@@ -84,9 +110,88 @@ Validated with 24 isolated-settings/offscreen tests, including export followed b
 editing, removal to empty, cancelled and saved renames, duplicate import filenames,
 and runner identity after display-label changes.
 
-Next: extract scanner identification with the IWADINFO task below. Launcher service
-extraction, controllers (including JSON workflow extraction), and widget moves remain
-pending.
+Module/package movement is implemented.
+The launcher service accepts an explicit request and owns command construction
+and process setup. `LaunchController` now validates selections, saves remembered
+choices, owns the process lifetime, and reports outcomes through signals. Widgets
+now live in the views package.
+
+## Implemented: scan controller ownership
+
+`ScanController` now owns manual and Steam workers, repository injection,
+progress, completion, and shutdown. The main window chooses directories, submits
+local dropped paths, and displays results through controller signals. Individual
+dropped files also run in workers, and each completed scan refreshes the library
+on the GUI thread. Steam requests are ignored while a Steam scan is already active;
+shutdown interrupts all workers before joining them. Manual completion only updates
+the status bar, preserving the current launch and Discord state.
+
+The old `GameScanner` API remains as a compatibility adapter; production UI paths
+no longer instantiate it. Worker classes now live in the services package; the
+legacy dialog lives in views. IWAD archive/dependency support remains pending.
+
+Validated with injected disposable settings, multiple dropped files, GUI-thread
+callbacks, repeated Steam requests, shutdown, and existing workflow tests.
+
+## Implemented: library selection controller
+
+`LibraryController` resolves compatible runners and installed versions from one
+repository library snapshot and the selected record's remembered choices. It emits
+records to the main window, which only renders labels, enabled states, and item data.
+Selection changes and scan-driven table refreshes use this controller; compatibility
+entry points remain for existing dialog callers. Settings identities and model
+compatibility rules are unchanged. Module moves are implemented.
+
+## Implemented: modpack controller and JSON boundary
+
+`ModpackController` owns immutable editor/import drafts, ordered file changes,
+row-based path resolution, persistence, removal, and remembered-selection migration
+on rename. Dialogs choose paths and render records; compatibility entry points
+remain available. Views reuse their parent's repository when supplied.
+
+`services.modpack_json` validates portable imports and converts JSON to unresolved
+records. Export omits local paths without mutating the draft. `MainWindow` submits
+an import path to the controller rather than reading JSON itself. Invalid JSON,
+unreadable files, and persistence/export errors are reported to the views; imports
+cannot be saved until all entries have paths. Duplicate filenames remain independent.
+
+Module/package movement is implemented.
+
+## Implemented: runner editing controller
+
+`RunnerController` owns source-port choices, record-backed selection, executable
+PATH discovery, path edits and validation, saving, and removal. `RunnerView`
+renders this state and retains file pickers, download links, and error dialogs.
+The view reuses its parent's repository when available. Saved overrides take
+priority over discovery; custom runners retain their identity on location changes.
+A saved runner named `Custom...` is distinguished from the new-custom entry by
+record identity rather than its label. Persistence failures emit error signals
+without reporting success or clearing the selection.
+
+Validated with 63 isolated-settings/offscreen tests, including controller discovery,
+manual overrides, custom creation/editing/removal, game-filtered choices, invalid
+paths, persistence failures, and the existing runner widget regressions.
+
+## Implemented: package layout and application bootstrap
+
+Dialogs, theme integration, and `MainWindow` now live in `src/views/`. Manual
+and Steam scan workers, the process adapter, and Discord integration live in
+`src/services/`. The legacy scanner dialog is separate from the worker and remains
+available through `src/scanner.py` compatibility imports. `main.MainWindow` also
+remains importable; `main.py` now only bootstraps the application and main window.
+The window obtains its stylesheet callback from the current QApplication rather
+than a global in the entry-point module.
+
+Source imports and test mock targets use the new packages. cx_Freeze configurations
+explicitly include application packages and the IWADINFO resource; PyInstaller
+already includes that resource and discovers the packages through static imports.
+Validated with 67 offscreen tests, Python compilation, source-entry-point and
+catalog imports, build-configuration syntax/resource checks, and `git diff --check`.
+Frozen builds were not run: cx_Freeze and PyInstaller are not installed. Manual
+GUI validation remains outstanding.
+
+Optional follow-ups: Qt model/view table adoption (step 6) and separately scoped
+IWAD archive/dependency work. Neither blocks completion of the core MVC refactor.
 
 ## Purpose
 
@@ -109,9 +214,8 @@ The project already separates several dialogs into view files, but presentation,
 src/
 ├── main.py                     # Create application and connect components
 ├── models/
-│   ├── game.py                 # Game and installed versions
-│   ├── runner.py               # Source port configuration
-│   ├── modpack.py              # Base game and ordered mod files
+│   ├── records.py              # Immutable games, versions, runners and modpacks
+│   ├── iwadinfo.py             # Offline IWADINFO parser and definitions
 │   ├── catalog.py              # IWADINFO definitions and supplemental metadata
 │   └── library.py              # Library state and compatibility rules
 ├── views/
@@ -123,7 +227,9 @@ src/
 │   ├── first_run_view.py       # Welcome and setup dialog
 │   └── theme.py
 ├── controllers/
-│   ├── library_controller.py   # Selection, scanning, runner/version choices
+│   ├── library_controller.py   # Library refresh and runner/version choices
+│   ├── scan_controller.py      # Worker ownership and scan orchestration
+│   ├── presence_controller.py  # Discord lifecycle and playing/idle state
 │   ├── launch_controller.py    # Launch workflow and process events
 │   ├── runner_controller.py    # Configure and save runners
 │   └── modpack_controller.py   # Edit, import, and export modpacks
@@ -167,16 +273,16 @@ Scanning should keep the interface responsive. Worker results must return to the
 
 ## Mapping existing behavior
 
-| Current behavior | Proposed owner |
-| --- | --- |
-| `MainWindow.getRunners()` and `getVersions()` | Library controller requests compatible choices from the model and updates the view |
-| `MainWindow.launchGame()` | Launch controller resolves selections and invokes the launcher service |
-| `GamesView.refresh()` and `loadModpacks()` reading settings | Repository loads records; view displays supplied records |
-| Settings access spread across dialogs | Settings repository |
-| Modpack editing, saving, importing, and exporting | Modpack controller coordinates model changes and persistence; JSON handling stays outside widgets |
-| `GameScanner` file dialog and scanning | View chooses paths; scanner service identifies files; controller coordinates saving and refresh |
-| `GameLauncher.processFinished()` displaying errors | Service reports completion; controller asks the view to display an error |
-| Discord updates in `MainWindow` | Controller coordinates the Discord service with application events |
+| Current behavior                                            | Proposed owner                                                                                    |
+| ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| `MainWindow.getRunners()` and `getVersions()`               | Library controller requests compatible choices from the model and updates the view                |
+| `MainWindow.launchGame()`                                   | Launch controller resolves selections and invokes the launcher service                            |
+| `GamesView.refresh()` and `loadModpacks()` reading settings | Repository loads records; view displays supplied records                                          |
+| Settings access spread across dialogs                       | Settings repository                                                                               |
+| Modpack editing, saving, importing, and exporting           | Modpack controller coordinates model changes and persistence; JSON handling stays outside widgets |
+| `GameScanner` file dialog and scanning                      | View chooses paths; scanner service identifies files; controller coordinates saving and refresh   |
+| `GameLauncher.processFinished()` displaying errors          | Service reports completion; controller asks the view to display an error                          |
+| Discord updates in `MainWindow`                             | Controller coordinates the Discord service with application events                                |
 
 ## Example: launching a game
 
@@ -207,22 +313,37 @@ def launch(self, request):
 
 A launch request should contain the resolved executable, game file, ordered mod files, runner information, and save directory. Command construction must preserve runner-specific arguments, including save-directory flags.
 
-This removes the current dependency on `self.parent().gameList.game`. Using `QProcess.setWorkingDirectory()` also avoids changing the working directory of the entire application with `os.chdir()`. Report both failure to start and unsuccessful process exits to the controller.
+The launch service no longer depends on `self.parent().gameList.game` or changes the application working directory. It uses `QProcess.setWorkingDirectory()`. `LaunchController` handles start failures and unsuccessful exits, emitting status and error signals for the main window to display.
 
 ## Incremental migration
 
 1. **Centralize persistence — implemented.** Introduce the settings repository and route existing settings access through it. Preserve the stored format and platform-specific configuration names. Keep the current widgets in place.
-2. **Introduce explicit models — initial slice implemented.** Define game, installed-version, runner, and modpack objects. Move static metadata into the catalog and compatibility logic into the library. Replace positional record access incrementally. Implement the IWADINFO catalog task below alongside scanner extraction.
-3. **Extract scanning and launching.** Separate the file picker from scanning. Give the launcher explicit inputs, remove parent-widget access, and report outcomes through signals. Preserve existing command arguments and save locations.
-4. **Extract controllers.** Move selection, runner/version population, launch coordination, and modpack workflows out of widgets. Connect user-intent signals to controllers and send display-ready results back to views.
-5. **Move modules into packages.** Reduce `main.py` to application setup and component wiring. Update imports and build configuration as files move. Retain references to controllers, dialogs, and asynchronous services for their required lifetimes.
+2. **Introduce explicit models — implemented.** Immutable records, catalog metadata, compatibility rules, and record-backed dialogs are in place. Dictionary adapters remain at compatibility and serialization boundaries. The initial IWADINFO WAD slice is implemented; format expansion below is a separate feature.
+3. **Extract scanning and launching — implemented.** Manual and Steam scanning use controller-owned workers with GUI-thread callbacks. The launcher accepts explicit inputs, has no parent-widget or settings access, uses a process working directory, and reports outcomes through Qt signals. Workers and process adapters now live in services.
+4. **Extract controllers — launch, scan, selection, modpack, and runner slices implemented.** `LaunchController` owns launch validation and process outcomes, `ScanController` owns workers, `LibraryController` resolves runner/version choices, `ModpackController` owns editor/import drafts and JSON workflows, and `RunnerController` owns runner configuration, detection, validation, and persistence.
+5. **Move modules into packages — implemented.** `main.py` bootstraps the application; `views/main_window.py` contains the window and existing component wiring. Imports and build configuration follow the new packages. Existing controller, dialog, and asynchronous-service ownership is preserved.
 6. **Optionally adopt Qt model/view tables.** Keep `QTableWidget` during the initial refactor. Later, replace it with `QTableView` and a `QAbstractTableModel` adapter if that simplifies refreshes and selection handling.
 
 A Qt table model is a presentation adapter for the library records, not the entire MVC domain model. This optional step should not block separating workflows from widgets.
 
 ## Planned task: adopt UZDoom IWADINFO for game identification
 
-Status: proposed; no IWADINFO parser or detector has been implemented.
+Status: WAD identification slice implemented. A pinned offline IWADINFO catalog is
+parsed into ordered definitions. A bounds-checked WAD directory reader matches
+`MustContain` rules for manual and Steam scans. Definitions whose filename hint
+maps to an existing library game use the existing settings identity; the previous
+filename and CRC method remains a fallback when no supported content mapping is
+available. The matched IWADINFO `Name` is saved as a display label and shown in
+the game list and version picker. Explicit edition aliases map KEX, Unity, BFG,
+and Xbox WAD hints to existing Doom, Doom II, TNT, and Plutonia identities;
+existing game and release keys remain unchanged
+for remembered selections and modpacks. CRC version metadata and blacklist checks
+still run for both methods.
+Unsupported upstream games, ZIP based IWADs, embedded definitions, companion
+requirements, and load ordering remain pending. Manual directory scans now use a
+Qt worker and GUI-thread signals for progress, refresh, and cleanup. Manual and
+Steam orchestration and launcher service/controller extraction are implemented;
+module moves are implemented.
 
 Replace the game-identification portion of `data.games` with definitions from
 [UZDoom's `wadsrc_extra/static/iwadinfo.txt`](https://github.com/UZDoom/UZDoom/blob/trunk/wadsrc_extra/static/iwadinfo.txt).

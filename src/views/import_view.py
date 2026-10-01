@@ -1,7 +1,6 @@
 """Import mod packs"""
 import sys
-from dataclasses import replace
-from models.records import ModFile, Modpack
+from controllers.modpack_controller import ModpackController
 import logging
 import webbrowser
 import qtawesome as qta
@@ -10,6 +9,7 @@ from PySide6 import QtCore, QtWidgets, QtGui
 
 class ModsImport(QtWidgets.QMainWindow):
     """Modpack importer"""
+    saved = QtCore.Signal()
     def __init__(self, parent, data):
         super().__init__(parent=parent)
         parent = self.parent()
@@ -19,7 +19,10 @@ class ModsImport(QtWidgets.QMainWindow):
         if "--debug" in sys.argv:
             self.logger.setLevel(logging.DEBUG)
         self.logger.info(f"{data}")
-        self.repository = SettingsRepository()
+        self.repository = getattr(parent, "repository", None) or SettingsRepository()
+        self.controller = ModpackController(self.repository, self, draft=data)
+        pack = self.controller.draft
+        self.controller.failed.connect(self.status.showMessage)
 
         mainLayout = QtWidgets.QVBoxLayout()
         self.modList = QtWidgets.QTableWidget()
@@ -44,25 +47,25 @@ class ModsImport(QtWidgets.QMainWindow):
 
         mainLayout.addLayout(modInfo)
         mainLayout.addWidget(self.modList)
-        self.name = data["name"]
-        self.base = data["base"]
-        mods = data["mods"]
+        self.name = pack.name
+        self.base = pack.base
+        mods = pack.files
         self.modList.setRowCount(len(mods))
         self.loadedCount = 0
         modInfo.setAlignment(QtCore.Qt.AlignTop)
         modInfo.addWidget(QtWidgets.QLabel(f"Name: {self.name}"), 0, 0)
         modInfo.addWidget(QtWidgets.QLabel(f"Base Game: {self.base}"), 1, 0)
-        self.mods = tuple(ModFile(mod["name"], None, mod["source"]) for mod in mods)
+        # Ordered records are supplied by the controller.
         count = 0
         greenCheck = qta.icon("fa5s.check", color="green")
         redXmark = qta.icon("fa5s.times", color="red")
         for e in mods:
-            self.modList.setItem(count,0,QtWidgets.QTableWidgetItem(e["name"]))
-            if len(e["source"]) > 0:
+            self.modList.setItem(count,0,QtWidgets.QTableWidgetItem(e.name))
+            if e.source:
                 source = QtWidgets.QTableWidgetItem(greenCheck,"")
             else:
                 source = QtWidgets.QTableWidgetItem(redXmark,"")
-            source.setToolTip(e["source"])
+            source.setToolTip(e.source or "")
             self.modList.setItem(count,1,source)
             count+=1
         count = None
@@ -88,6 +91,10 @@ class ModsImport(QtWidgets.QMainWindow):
         self.setAcceptDrops(True)
         self.updateStatus()
 
+    @property
+    def mods(self):
+        return self.controller.draft.files
+
     def dragEnterEvent(self, event):
         """Filters things dragged into window"""
         if event.mimeData().hasUrls():
@@ -109,20 +116,16 @@ class ModsImport(QtWidgets.QMainWindow):
         return super().closeEvent(event)
 
     def addDroppedModFile(self, file):
-        """Add mod file to list"""
-        fileName = file.split("/")[-1]
-        for row, mod in enumerate(self.mods):
-            if mod.name == fileName and mod.path is None:
-                self.setModPath(row, file)
-                break
+        row = self.controller.resolve_dropped(file)
+        if row is not None:
+            self.modList.setItem(row, 2, QtWidgets.QTableWidgetItem(file))
+            self.updateStatus()
 
     def setModPath(self, row, path):
         """Resolve a file by row identity, preserving duplicate names and order."""
-        mods = list(self.mods)
-        mods[row] = replace(mods[row], path=path)
-        self.mods = tuple(mods)
-        self.modList.setItem(row, 2, QtWidgets.QTableWidgetItem(path))
-        self.updateStatus()
+        if self.controller.change_file(row, path=path):
+            self.modList.setItem(row, 2, QtWidgets.QTableWidgetItem(path))
+            self.updateStatus()
 
     def addModFile(self):
         """Choose a local file for the selected entry."""
@@ -137,8 +140,7 @@ class ModsImport(QtWidgets.QMainWindow):
             self.setModPath(row, chooser.selectedFiles()[0])
 
     def updateStatus(self):
-        """Update mod counts in the status bar"""
-        self.loadedCount = sum(mod.path is not None for mod in self.mods)
+        self.loadedCount = self.controller.loaded_count
         self.status.showMessage(f"{len(self.mods)} mods, {self.loadedCount} loaded")
         self.finishButton.setEnabled(self.loadedCount == len(self.mods))
 
@@ -155,13 +157,9 @@ class ModsImport(QtWidgets.QMainWindow):
             webbrowser.open(self.mods[row].source)
 
     def saveModpack(self):
-        """Saves modpack to registry and closes window"""
-        self.logger.info(f"Saving modpack \"{self.name}\" for \"{self.base}\"")
-        if any(mod.path is None for mod in self.mods):
-            return
-        self.repository.save_modpack_record(Modpack(self.name, self.base, self.mods))
-        self.parent().gameList.refresh()
-        self.close()
+        if self.controller.save(require_resolved=True):
+            self.saved.emit()
+            self.close()
 
     def showWindow(self):
         """Open window and set size/location"""

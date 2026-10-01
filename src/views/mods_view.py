@@ -1,28 +1,30 @@
 """The module for the modpack window"""
 import os
 import logging
-import json
-from dataclasses import replace
-from models.records import ModFile, Modpack
+from controllers.modpack_controller import ModpackController
 from repositories.settings_repository import SettingsRepository
 from PySide6 import QtCore, QtWidgets, QtGui
 
 
 class ModsView(QtWidgets.QMainWindow):
     """Modpack editor window"""
+    refresh_requested = QtCore.Signal()
     def __init__(self, parent):
         super().__init__(parent=parent)
         self.setWindowModality(QtCore.Qt.ApplicationModal)
 
         self.logger = logging.getLogger("Modpack Editor")
-        self.repository = SettingsRepository()
+        self.repository = getattr(parent, "repository", None) or SettingsRepository()
 
-        self.mods = Modpack("Mod name", "", ())
-        self.original_name = None
+        self.controller = ModpackController(self.repository, self)
+        self.controller.failed.connect(self._show_error)
 
         self.setWindowTitle("Modpack Builder")
 
-        self.gameList = self.parent()
+        # Compatibility adapter for callers still parenting the editor to a table.
+        self.gameList = parent if hasattr(parent, "selected_record") else None
+        if self.gameList is not None:
+            self.refresh_requested.connect(self.gameList.refresh)
 
         mainLayout = QtWidgets.QVBoxLayout()
         header = QtWidgets.QHBoxLayout()
@@ -119,6 +121,19 @@ class ModsView(QtWidgets.QMainWindow):
 
         self.setCentralWidget(scroll)
 
+    @property
+    def mods(self):
+        """Compatibility access to the controller-owned draft."""
+        return self.controller.draft
+
+    @mods.setter
+    def mods(self, pack):
+        self.controller.draft = pack
+
+    def _show_error(self, message):
+        error = QtWidgets.QErrorMessage(self)
+        error.showMessage(message)
+
     def dragEnterEvent(self, event):
         """Filters things dragged into window"""
         if event.mimeData().hasUrls():
@@ -133,25 +148,19 @@ class ModsView(QtWidgets.QMainWindow):
             self.addFileToList(path)
 
     def addFileToList(self, filePath):
-        """Adds mod to mod pack"""
-        if any(file.path == filePath for file in self.mods.files):
-            return
-        file = ModFile(os.path.basename(filePath), filePath, "")
-        self.mods = replace(self.mods, files=self.mods.files + (file,))
-        self.modList.addItem(file.name)
+        """Submit a local file to the draft."""
+        if self.controller.add_file(filePath):
+            self.modList.addItem(self.mods.files[-1].name)
 
 
     def baseComboBuilder(self):
-        """Generate base game combo box options"""
+        """Render the controller's available families."""
         self.baseSelect.clear()
-        bases = sorted({game.family for game in self.repository.library().games
-                        if game.family})
-        self.baseSelect.addItems(bases)
-        self.mods = replace(self.mods, base=self.baseSelect.currentText())
+        self.baseSelect.addItems(self.controller.bases())
+        self.controller.change(base=self.baseSelect.currentText())
 
     def baseChanged(self, text):
-        """Update the draft base family."""
-        self.mods = replace(self.mods, base=text)
+        self.controller.change(base=text)
 
     def selectedModChanged(self, currentRow):
         """Display the selected file, including an empty selection."""
@@ -173,12 +182,9 @@ class ModsView(QtWidgets.QMainWindow):
         self.selectedModChanged(selected)
 
     def removeMod(self):
-        """Remove only a selected file."""
-        row = self.modList.currentRow()
-        if not 0 <= row < len(self.mods.files):
-            return
-        self.mods = replace(self.mods, files=self.mods.files[:row] + self.mods.files[row + 1:])
-        self.refreshFiles(min(row, len(self.mods.files) - 1))
+        selected = self.controller.remove_file(self.modList.currentRow())
+        if selected is not None:
+            self.refreshFiles(selected)
 
     def addMod(self):
         """Open file chooser for mod file"""
@@ -187,15 +193,9 @@ class ModsView(QtWidgets.QMainWindow):
             self.addFileToList(str(file.toLocalFile()))
 
     def changeModPosition(self, i):
-        """Reorder mod entry"""
-        row = self.modList.currentRow()
-        target = row + i
-        if not (0 <= row < len(self.mods.files) and 0 <= target < len(self.mods.files)):
-            return
-        files = list(self.mods.files)
-        files[row], files[target] = files[target], files[row]
-        self.mods = replace(self.mods, files=tuple(files))
-        self.refreshFiles(target)
+        selected = self.controller.move_file(self.modList.currentRow(), i)
+        if selected is not None:
+            self.refreshFiles(selected)
 
     def moveUp(self):
         """Calls changeModPosition"""
@@ -206,18 +206,12 @@ class ModsView(QtWidgets.QMainWindow):
         self.changeModPosition(1)
 
     def saveFile(self):
-        """Saves modpack to registry"""
-        if self.mods.name:
-            self.repository.save_modpack_record(self.mods)
-            if self.original_name and self.original_name != self.mods.name:
-                runner, version = self.repository.last_selection(self.original_name, modpack=True)
-                self.repository.save_selection(self.mods.name, runner, version, modpack=True)
-                self.repository.remove_modpack(self.original_name)
+        if self.controller.save():
             self.close()
 
     def changeName(self, text):
         """Rename the draft; persistence waits until Save."""
-        self.mods = replace(self.mods, name=text)
+        self.controller.change(name=text)
 
     def changeModName(self, text):
         """Change the selected file's name."""
@@ -228,16 +222,13 @@ class ModsView(QtWidgets.QMainWindow):
         self.changeSelectedFile(source=text)
 
     def changeSelectedFile(self, **changes):
-        if self.selected is None:
-            return
-        files = list(self.mods.files)
-        files[self.selected] = replace(files[self.selected], **changes)
-        self.mods = replace(self.mods, files=tuple(files))
+        if self.selected is not None:
+            self.controller.change_file(self.selected, **changes)
 
     def showWindow(self):
         """Displays the window"""
         self.setFixedSize(500, 500)
-        mainLocation = self.parent().parent().frameGeometry()
+        mainLocation = self.parent().window().frameGeometry()
         x = mainLocation.x() + mainLocation.width() / 2 - self.width() / 2
         y = mainLocation.y() + mainLocation.height() / 2 - self.height() / 2
         self.move(x, y)
@@ -245,41 +236,34 @@ class ModsView(QtWidgets.QMainWindow):
 
     def closeEvent(self, event: QtGui.QCloseEvent) -> None:
         """Refreshes game list while closing modpack menu"""
-        self.gameList.refresh()
+        self.refresh_requested.emit()
         self.deleteLater()
         return super().closeEvent(event)
 
-    def openFile(self):
-        """Loads mod pack from registry"""
-        name = self.gameList.selected_record.name
-        pack = next(pack for pack in self.repository.library().modpacks if pack.name == name)
-        self.original_name = name
-        self.nameEdit.setText(name)
-        if self.baseSelect.findText(pack.base or "") < 0:
-            self.baseSelect.addItem(pack.base or "")
-        self.baseSelect.setCurrentText(pack.base or "")
-        self.mods = pack
+    def openFile(self, record=None):
+        """Render an explicitly supplied record (or a legacy table selection)."""
+        if record is None and self.gameList is not None:
+            record = self.gameList.selected_record
+        pack = self.controller.open(record)
+        self.nameEdit.setText(pack.name)
+        with QtCore.QSignalBlocker(self.baseSelect):
+            if self.baseSelect.findText(pack.base or "") < 0:
+                self.baseSelect.addItem(pack.base or "")
+            self.baseSelect.setCurrentText(pack.base or "")
         self.refreshFiles(0 if pack.files else -1)
         self.showWindow()
 
-    def rmFile(self):
-        """Removes mod pack"""
-        name = self.gameList.selected_record.name
-        self.repository.remove_modpack(name)
-        self.logger.info("Removing %s", name)
-        self.gameList.refresh()
+    def rmFile(self, record=None):
+        if record is None and self.gameList is not None:
+            record = self.gameList.selected_record
+        if self.controller.remove(record):
+            self.refresh_requested.emit()
 
     def exportJson(self):
-        """Save current modpack to json file"""
-        save_to = QtWidgets.QFileDialog().getSaveFileName(self, "Save To...",
-            filter="JSON (*.json)")
-        self.logger.info("Saving JSON to: %s", save_to[0])
-        if not save_to[0]:
-            return
-        data = {
-            "name": self.mods.name,
-            "base": self.mods.base,
-            "mods": [{"name": file.name, "source": file.source} for file in self.mods.files],
-        }
-        with open(save_to[0], "w", encoding="utf-8") as outfile:
-            outfile.write(json.dumps(data, indent=4))
+        """Choose a destination; the controller owns export."""
+        chooser = QtWidgets.QFileDialog(self, "Save To...")
+        chooser.setAcceptMode(QtWidgets.QFileDialog.AcceptSave)
+        chooser.setNameFilter("JSON (*.json)")
+        chooser.setDefaultSuffix("json")
+        if chooser.exec():
+            self.controller.export_json(chooser.selectedFiles()[0])

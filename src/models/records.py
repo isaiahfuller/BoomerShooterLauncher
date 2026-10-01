@@ -9,6 +9,11 @@ class InstalledVersion:
     version: str | None
     crc: str | None
     path: str | None
+    label: str | None = None
+
+    @property
+    def display_name(self):
+        return self.label or self.name
 
 
 @dataclass(frozen=True)

@@ -10,19 +10,19 @@ from tempfile import TemporaryDirectory
 from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from PySide6 import QtCore, QtWidgets
-import main
-from mods_view import ModsView
-from import_view import ModsImport
-from runner_view import RunnerView
-from scanner import GameScanner
-from launcher import GameLauncher
+from views import main_window as main
+from views.mods_view import ModsView
+from views.import_view import ModsImport
+from views.runner_view import RunnerView
+from views.scanner import GameScanner
+from services.launcher import GameLauncher
+from services.launch import LaunchRequest
 from repositories.settings_repository import SettingsRepository
 
 
 class SettingsWorkflowTests(unittest.TestCase):
     def test_record_selection_survives_labels_refresh_and_duplicate_versions(self):
         app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
-        main.app = app
         with TemporaryDirectory() as directory:
             factory = lambda: QtCore.QSettings(
                 str(Path(directory) / 'config.ini'), QtCore.QSettings.IniFormat)
@@ -54,9 +54,9 @@ class SettingsWorkflowTests(unittest.TestCase):
                 window.runnerCombobox.setItemText(0, 'Different runner label')
                 with patch.object(GameLauncher, 'runGame') as launch:
                     window.launchGame()
-                    launch.assert_called_once_with(
-                        'Doom', '/games/second.wad', 'UZDoom',
-                        ['/mods/a, b.pk3', '/mods/last.wad'])
+                    launch.assert_called_once_with(LaunchRequest(
+                        'First', '/games/second.wad', 'UZDoom', '/ports/uzdoom',
+                        ('/mods/a, b.pk3', '/mods/last.wad')))
                 self.assertEqual(repo.last_selection('First', modpack=True),
                                  ('UZDoom', 'Registered'))
                 self.assertEqual(repo.last_selection('First'), (None, None))
@@ -70,9 +70,28 @@ class SettingsWorkflowTests(unittest.TestCase):
                 self.assertFalse(window.runnerCombobox.isEnabled())
                 window.close()
 
+    def test_launch_controller_signals_update_window(self):
+        app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+        with TemporaryDirectory() as directory:
+            factory = lambda: QtCore.QSettings(
+                str(Path(directory) / 'config.ini'), QtCore.QSettings.IniFormat)
+            repo = SettingsRepository(factory)
+            repo.save_window_geometry(QtWidgets.QMainWindow().saveGeometry())
+            with patch('repositories.settings_repository.create_settings', factory), \
+                 patch.object(main, 'Theme'), patch.object(main, 'Discord'), \
+                 patch('views.main_window.QtWidgets.QErrorMessage') as message:
+                window = main.MainWindow()
+                window.launchController.started.emit('Doom', 'UZDoom', 'Registered')
+                self.assertTrue(window.game_running)
+                self.assertIn('Playing Doom with UZDoom', window.status.currentMessage())
+                window.launchController.stopped.emit()
+                self.assertFalse(window.game_running)
+                window.launchController.failed.emit('UZDoom exited with code 3')
+                self.assertIn('code 3', message.return_value.showMessage.call_args.args[0])
+                window.close()
+
     def test_settings_backed_workflows(self):
         app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
-        main.app = app
         with TemporaryDirectory() as directory:
             settings_path = str(Path(directory) / 'config.ini')
             factory = lambda: QtCore.QSettings(settings_path, QtCore.QSettings.IniFormat)
@@ -93,27 +112,33 @@ class SettingsWorkflowTests(unittest.TestCase):
                              ['/mods/first.pk3', '/mods/second.wad'])
             with patch('repositories.settings_repository.create_settings', factory), \
                  patch.object(main, 'Theme'), patch.object(main, 'Discord'):
-                window = main.MainWindow()
+                with patch.object(main.ScanController, 'scan_steam') as startup_scan:
+                    window = main.MainWindow()
+                    startup_scan.assert_called_once_with()
+                assert not hasattr(window, 'steamScanAction')
+                assert all('Steam Games' not in action.text() for action in window.actions())
                 assert window.gameList.rowCount() == 2
                 window.gameList.selectRow(0)
                 assert window.runnerCombobox.currentText() == 'UZDoom'
                 assert window.runnerCombobox.isEnabled()
-                assert window.versionCombobox.currentText() == 'Registered'
+                assert window.versionCombobox.currentText() == 'Registered — /games/doom.wad'
                 repo.save_selection('The Ultimate Doom', 'Removed port', 'Removed release')
                 window.getRunners()
                 window.getVersions()
                 self.assertEqual(window.currentRunners, ['UZDoom'])
                 self.assertEqual(window.currentVersions, ['Registered'])
                 self.assertEqual(window.runnerCombobox.currentText(), 'UZDoom')
-                self.assertEqual(window.versionCombobox.currentText(), 'Registered')
+                self.assertEqual(window.versionCombobox.currentText(), 'Registered — /games/doom.wad')
                 with patch.object(GameLauncher, 'runGame') as launch:
                     window.launchGame()
-                    launch.assert_called_once_with('Doom', '/games/doom.wad', 'UZDoom', [])
+                    launch.assert_called_once_with(LaunchRequest(
+                        'The Ultimate Doom', '/games/doom.wad', 'UZDoom', '/ports/uzdoom'))
                 window.gameList.selectRow(1)
                 with patch.object(GameLauncher, 'runGame') as launch:
                     window.launchGame()
-                    launch.assert_called_once_with('Doom', '/games/doom.wad', 'UZDoom',
-                                                    ['/mods/first.pk3', '/mods/second.wad'])
+                    launch.assert_called_once_with(LaunchRequest(
+                        'Pack', '/games/doom.wad', 'UZDoom', '/ports/uzdoom',
+                        ('/mods/first.pk3', '/mods/second.wad')))
                 assert repo.last_selection('Pack', modpack=True) == ('UZDoom', 'Registered')
                 editor = ModsView(window.gameList)
                 with patch.object(editor, 'showWindow'):
@@ -137,12 +162,11 @@ class SettingsWorkflowTests(unittest.TestCase):
                 assert any(release['path'] == str(wad) for game in repo.games().values()
                            for release in game['releases'].values())
                 scanner.deleteLater()
-                with patch('steam_scanner.installed_game_directories', return_value=[Path(directory)]):
+                with patch('services.steam_scanner.installed_game_directories', return_value=[Path(directory)]):
                     window.scanSteamGames()
                     worker = window.steamScanner
                     window.scanSteamGames()
                     assert window.steamScanner is worker
-                    assert not window.steamScanAction.isEnabled()
                     loop = QtCore.QEventLoop()
                     worker.finished.connect(loop.quit)
                     timeout = QtCore.QTimer()
@@ -152,7 +176,6 @@ class SettingsWorkflowTests(unittest.TestCase):
                     loop.exec()
                     timeout.stop()
                     assert window.steamScanner is None
-                    assert window.steamScanAction.isEnabled()
                     assert '1 supported game files' in window.status.currentMessage()
                 window.writeSettings()
                 assert not repo.window_geometry().isEmpty()
