@@ -10,3 +10,4 @@ pyqtdarktheme
 qtawesome
 darkdetect
 pytest
+cx_Freeze
