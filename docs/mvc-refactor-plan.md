@@ -8,8 +8,8 @@ Status: persistence centralization and the initial domain-model slice are implem
 group, key, and array access. The main window, game list, runner editor, modpack
 editor/importer, scanner, and launcher use repository methods for persistence.
 Dictionary APIs remain for callers awaiting migration; the library adapter supplies
-domain records. Launch, scan, library selection, and modpack controllers now own
-these workflow slices; runner editing remains pending.
+domain records. Launch, scan, library selection, modpack, and runner controllers
+now own these workflow slices; module/package movement remains pending.
 
 The repository preserves the Windows organization/application names
 `Isaiah Fuller` / `Boomer Shooter Launcher` and the Linux names
@@ -85,11 +85,11 @@ Validated with 24 isolated-settings/offscreen tests, including export followed b
 editing, removal to empty, cancelled and saved renames, duplicate import filenames,
 and runner identity after display-label changes.
 
-Next: extract runner editing workflows, then move modules into packages.
+Next: move modules into packages.
 The launcher service accepts an explicit request and owns command construction
 and process setup. `LaunchController` now validates selections, saves remembered
-choices, owns the process lifetime, and reports outcomes through signals. Runner
-editing controller extraction and widget moves remain pending.
+choices, owns the process lifetime, and reports outcomes through signals. Widget
+moves remain pending.
 
 ## Implemented: scan controller ownership
 
@@ -115,7 +115,7 @@ repository library snapshot and the selected record's remembered choices. It emi
 records to the main window, which only renders labels, enabled states, and item data.
 Selection changes and scan-driven table refreshes use this controller; compatibility
 entry points remain for existing dialog callers. Settings identities and model
-compatibility rules are unchanged. Runner editing and module moves remain pending.
+compatibility rules are unchanged. Module moves remain pending.
 
 ## Implemented: modpack controller and JSON boundary
 
@@ -130,7 +130,22 @@ an import path to the controller rather than reading JSON itself. Invalid JSON,
 unreadable files, and persistence/export errors are reported to the views; imports
 cannot be saved until all entries have paths. Duplicate filenames remain independent.
 
-Runner editing controller extraction and module/package movement are next.
+Module/package movement is next.
+
+## Implemented: runner editing controller
+
+`RunnerController` owns source-port choices, record-backed selection, executable
+PATH discovery, path edits and validation, saving, and removal. `RunnerView`
+renders this state and retains file pickers, download links, and error dialogs.
+The view reuses its parent's repository when available. Saved overrides take
+priority over discovery; custom runners retain their identity on location changes.
+A saved runner named `Custom...` is distinguished from the new-custom entry by
+record identity rather than its label. Persistence failures emit error signals
+without reporting success or clearing the selection.
+
+Validated with 63 isolated-settings/offscreen tests, including controller discovery,
+manual overrides, custom creation/editing/removal, game-filtered choices, invalid
+paths, persistence failures, and the existing runner widget regressions.
 
 ## Purpose
 
@@ -258,7 +273,7 @@ The launch service no longer depends on `self.parent().gameList.game` or changes
 1. **Centralize persistence — implemented.** Introduce the settings repository and route existing settings access through it. Preserve the stored format and platform-specific configuration names. Keep the current widgets in place.
 2. **Introduce explicit models — initial slice implemented.** Define game, installed-version, runner, and modpack objects. Move static metadata into the catalog and compatibility logic into the library. Replace positional record access incrementally. Implement the IWADINFO catalog task below alongside scanner extraction.
 3. **Extract scanning and launching — workflow slice implemented.** Manual and Steam scanning use controller-owned workers with GUI-thread callbacks. The launcher accepts explicit inputs, has no parent-widget or settings access, uses a process working directory, and reports outcomes through Qt signals. Module moves remain pending.
-4. **Extract controllers — launch, scan, selection, and modpack slices implemented.** `LaunchController` owns launch validation and process outcomes, `ScanController` owns workers, `LibraryController` resolves runner/version choices, and `ModpackController` owns editor/import drafts and JSON workflows. Move runner editing out of widgets next.
+4. **Extract controllers — launch, scan, selection, modpack, and runner slices implemented.** `LaunchController` owns launch validation and process outcomes, `ScanController` owns workers, `LibraryController` resolves runner/version choices, `ModpackController` owns editor/import drafts and JSON workflows, and `RunnerController` owns runner configuration, detection, validation, and persistence.
 5. **Move modules into packages.** Reduce `main.py` to application setup and component wiring. Update imports and build configuration as files move. Retain references to controllers, dialogs, and asynchronous services for their required lifetimes.
 6. **Optionally adopt Qt model/view tables.** Keep `QTableWidget` during the initial refactor. Later, replace it with `QTableView` and a `QAbstractTableModel` adapter if that simplifies refreshes and selection handling.
 
