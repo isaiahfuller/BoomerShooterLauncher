@@ -5,7 +5,7 @@ from pathlib import Path
 from models.records import Game, Modpack
 from repositories.settings_repository import SettingsRepository
 from PySide6 import QtCore, QtWidgets
-from mods_view import ModsView
+from views.mods_view import ModsView
 
 class GamesView(QtWidgets.QTableWidget):
     """Displays games in a table"""

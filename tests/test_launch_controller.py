@@ -13,7 +13,7 @@ _APP = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'src'))
 from controllers.launch_controller import LaunchController
-from launcher import GameLauncher
+from services.launcher import GameLauncher
 from models.records import InstalledVersion, ModFile, Modpack, Runner
 from services.launch import LaunchCommand, LaunchRequest
 
@@ -65,7 +65,7 @@ class LaunchControllerTests(unittest.TestCase):
             timer = QtCore.QTimer()
             timer.setSingleShot(True)
             timer.timeout.connect(loop.quit)
-            with patch('launcher.build_launch_command', return_value=command):
+            with patch('services.launcher.build_launch_command', return_value=command):
                 self.controller.launch(self.pack, self.version, runner,
                                        has_runners=True)
                 timer.start(5000)

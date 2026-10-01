@@ -3,7 +3,7 @@ import logging
 
 from PySide6 import QtCore
 
-from launcher import GameLauncher
+from services.launcher import GameLauncher
 from models.records import Modpack
 from services.launch import LaunchRequest
 

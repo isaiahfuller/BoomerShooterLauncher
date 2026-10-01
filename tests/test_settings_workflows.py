@@ -10,12 +10,12 @@ from tempfile import TemporaryDirectory
 from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from PySide6 import QtCore, QtWidgets
-import main
-from mods_view import ModsView
-from import_view import ModsImport
-from runner_view import RunnerView
-from scanner import GameScanner
-from launcher import GameLauncher
+from views import main_window as main
+from views.mods_view import ModsView
+from views.import_view import ModsImport
+from views.runner_view import RunnerView
+from views.scanner import GameScanner
+from services.launcher import GameLauncher
 from services.launch import LaunchRequest
 from repositories.settings_repository import SettingsRepository
 
@@ -23,7 +23,6 @@ from repositories.settings_repository import SettingsRepository
 class SettingsWorkflowTests(unittest.TestCase):
     def test_record_selection_survives_labels_refresh_and_duplicate_versions(self):
         app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
-        main.app = app
         with TemporaryDirectory() as directory:
             factory = lambda: QtCore.QSettings(
                 str(Path(directory) / 'config.ini'), QtCore.QSettings.IniFormat)
@@ -73,7 +72,6 @@ class SettingsWorkflowTests(unittest.TestCase):
 
     def test_launch_controller_signals_update_window(self):
         app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
-        main.app = app
         with TemporaryDirectory() as directory:
             factory = lambda: QtCore.QSettings(
                 str(Path(directory) / 'config.ini'), QtCore.QSettings.IniFormat)
@@ -81,7 +79,7 @@ class SettingsWorkflowTests(unittest.TestCase):
             repo.save_window_geometry(QtWidgets.QMainWindow().saveGeometry())
             with patch('repositories.settings_repository.create_settings', factory), \
                  patch.object(main, 'Theme'), patch.object(main, 'Discord'), \
-                 patch('main.QtWidgets.QErrorMessage') as message:
+                 patch('views.main_window.QtWidgets.QErrorMessage') as message:
                 window = main.MainWindow()
                 window.launchController.started.emit('Doom', 'UZDoom', 'Registered')
                 self.assertTrue(window.game_running)
@@ -94,7 +92,6 @@ class SettingsWorkflowTests(unittest.TestCase):
 
     def test_settings_backed_workflows(self):
         app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
-        main.app = app
         with TemporaryDirectory() as directory:
             settings_path = str(Path(directory) / 'config.ini')
             factory = lambda: QtCore.QSettings(settings_path, QtCore.QSettings.IniFormat)
@@ -165,7 +162,7 @@ class SettingsWorkflowTests(unittest.TestCase):
                 assert any(release['path'] == str(wad) for game in repo.games().values()
                            for release in game['releases'].values())
                 scanner.deleteLater()
-                with patch('steam_scanner.installed_game_directories', return_value=[Path(directory)]):
+                with patch('services.steam_scanner.installed_game_directories', return_value=[Path(directory)]):
                     window.scanSteamGames()
                     worker = window.steamScanner
                     window.scanSteamGames()

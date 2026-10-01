@@ -9,7 +9,7 @@ from unittest.mock import patch
 from PySide6 import QtCore
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'src'))
-from launcher import GameLauncher
+from services.launcher import GameLauncher
 from services.launch import LaunchCommand, LaunchRequest, build_launch_command
 
 
@@ -46,7 +46,7 @@ class LaunchServiceTests(unittest.TestCase):
             request = LaunchRequest('Doom', '/games/doom.wad', 'Port', str(script))
             original_directory = os.getcwd()
             process = GameLauncher()
-            with patch('launcher.build_launch_command', return_value=command):
+            with patch('services.launcher.build_launch_command', return_value=command):
                 process.runGame(request)
                 self.assertTrue(process.waitForFinished(5000))
             self.assertEqual(process.exitCode(), 0)

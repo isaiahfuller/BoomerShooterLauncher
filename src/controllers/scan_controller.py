@@ -2,8 +2,8 @@
 
 from PySide6 import QtCore
 
-from scanner import DirectoryScanWorker
-from steam_scanner import SteamScanner
+from services.scanner import DirectoryScanWorker
+from services.steam_scanner import SteamScanner
 
 
 class ScanController(QtCore.QObject):

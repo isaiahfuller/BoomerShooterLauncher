@@ -10,7 +10,7 @@ from unittest.mock import patch
 from PySide6 import QtCore, QtWidgets
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'src'))
 import data
-from runner_view import RunnerView
+from views.runner_view import RunnerView
 from repositories.settings_repository import SettingsRepository
 
 

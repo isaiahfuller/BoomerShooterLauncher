@@ -10,7 +10,7 @@ from pathlib import Path
 from PySide6 import QtCore, QtWidgets
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'src'))
-from scanner import GameScanner
+from views.scanner import GameScanner
 from services.game_files import scan_game_file
 
 

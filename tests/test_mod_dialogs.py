@@ -11,8 +11,8 @@ from unittest.mock import Mock, patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from PySide6 import QtCore, QtWidgets
 from models.records import ModFile, Modpack
-from mods_view import ModsView
-from import_view import ModsImport
+from views.mods_view import ModsView
+from views.import_view import ModsImport
 from repositories.settings_repository import SettingsRepository
 
 

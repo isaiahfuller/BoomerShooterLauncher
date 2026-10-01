@@ -13,7 +13,7 @@ from PySide6 import QtCore
 from repositories.settings_repository import SettingsRepository
 from services.game_files import scan_game_file
 from services.steam import installed_game_directories, read_vdf, steam_roots
-from steam_scanner import SteamScanner
+from services.steam_scanner import SteamScanner
 
 
 class SteamTests(unittest.TestCase):
@@ -96,8 +96,8 @@ class SteamTests(unittest.TestCase):
         results = []
         worker.completed.connect(lambda *args: results.append(args))
         with (
-            patch("steam_scanner.installed_game_directories", return_value=[install]),
-            patch("steam_scanner.SettingsRepository", return_value=repo),
+            patch("services.steam_scanner.installed_game_directories", return_value=[install]),
+            patch("services.steam_scanner.SettingsRepository", return_value=repo),
         ):
             worker.run()
         self.assertEqual(results, [(1, 1, 0)])

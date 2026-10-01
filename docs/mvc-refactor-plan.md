@@ -9,15 +9,15 @@ group, key, and array access. The main window, game list, runner editor, modpack
 editor/importer, scanner, and launcher use repository methods for persistence.
 Dictionary APIs remain for callers awaiting migration; the library adapter supplies
 domain records. Launch, scan, library selection, modpack, and runner controllers
-now own these workflow slices; module/package movement remains pending.
+now own these workflow slices; module/package movement is implemented.
 
 The repository preserves the Windows organization/application names
 `Isaiah Fuller` / `Boomer Shooter Launcher` and the Linux names
 `boomershooterlauncher` / `config`, along with the existing native settings format
 and schema. Each operation creates a fresh settings instance, so scanning and UI
 operations do not share mutable settings group or array cursors. Writes sync before
-returning and report persistence errors. Scanner-to-widget threading behavior is
-unchanged and remains part of the service extraction stage.
+returning and report persistence errors. Controller-owned scan workers report
+results to widgets on the GUI thread.
 
 Modpack saves preserve file order and remembered selections, and clear obsolete
 file entries when a pack shrinks or becomes empty. Remembered runners are read
@@ -85,11 +85,11 @@ Validated with 24 isolated-settings/offscreen tests, including export followed b
 editing, removal to empty, cancelled and saved renames, duplicate import filenames,
 and runner identity after display-label changes.
 
-Next: move modules into packages.
+Module/package movement is implemented.
 The launcher service accepts an explicit request and owns command construction
 and process setup. `LaunchController` now validates selections, saves remembered
-choices, owns the process lifetime, and reports outcomes through signals. Widget
-moves remain pending.
+choices, owns the process lifetime, and reports outcomes through signals. Widgets
+now live in the views package.
 
 ## Implemented: scan controller ownership
 
@@ -102,8 +102,8 @@ shutdown interrupts all workers before joining them. Manual completion only upda
 the status bar, preserving the current launch and Discord state.
 
 The old `GameScanner` API remains as a compatibility adapter; production UI paths
-no longer instantiate it. Worker classes remain in their existing modules pending
-the package move. IWAD archive/dependency support remains pending.
+no longer instantiate it. Worker classes now live in the services package; the
+legacy dialog lives in views. IWAD archive/dependency support remains pending.
 
 Validated with injected disposable settings, multiple dropped files, GUI-thread
 callbacks, repeated Steam requests, shutdown, and existing workflow tests.
@@ -115,7 +115,7 @@ repository library snapshot and the selected record's remembered choices. It emi
 records to the main window, which only renders labels, enabled states, and item data.
 Selection changes and scan-driven table refreshes use this controller; compatibility
 entry points remain for existing dialog callers. Settings identities and model
-compatibility rules are unchanged. Module moves remain pending.
+compatibility rules are unchanged. Module moves are implemented.
 
 ## Implemented: modpack controller and JSON boundary
 
@@ -130,7 +130,7 @@ an import path to the controller rather than reading JSON itself. Invalid JSON,
 unreadable files, and persistence/export errors are reported to the views; imports
 cannot be saved until all entries have paths. Duplicate filenames remain independent.
 
-Module/package movement is next.
+Module/package movement is implemented.
 
 ## Implemented: runner editing controller
 
@@ -146,6 +146,27 @@ without reporting success or clearing the selection.
 Validated with 63 isolated-settings/offscreen tests, including controller discovery,
 manual overrides, custom creation/editing/removal, game-filtered choices, invalid
 paths, persistence failures, and the existing runner widget regressions.
+
+## Implemented: package layout and application bootstrap
+
+Dialogs, theme integration, and `MainWindow` now live in `src/views/`. Manual
+and Steam scan workers, the process adapter, and Discord integration live in
+`src/services/`. The legacy scanner dialog is separate from the worker and remains
+available through `src/scanner.py` compatibility imports. `main.MainWindow` also
+remains importable; `main.py` now only bootstraps the application and main window.
+The window obtains its stylesheet callback from the current QApplication rather
+than a global in the entry-point module.
+
+Source imports and test mock targets use the new packages. cx_Freeze configurations
+explicitly include application packages and the IWADINFO resource; PyInstaller
+already includes that resource and discovers the packages through static imports.
+Validated with 67 offscreen tests, Python compilation, source-entry-point and
+catalog imports, build-configuration syntax/resource checks, and `git diff --check`.
+Frozen builds were not run: cx_Freeze and PyInstaller are not installed. Manual
+GUI validation remains outstanding.
+
+Next: optional Qt model/view table adoption (step 6), or the separately scoped
+remaining IWAD archive/dependency work. Neither is required for this package move.
 
 ## Purpose
 
@@ -272,9 +293,9 @@ The launch service no longer depends on `self.parent().gameList.game` or changes
 
 1. **Centralize persistence — implemented.** Introduce the settings repository and route existing settings access through it. Preserve the stored format and platform-specific configuration names. Keep the current widgets in place.
 2. **Introduce explicit models — initial slice implemented.** Define game, installed-version, runner, and modpack objects. Move static metadata into the catalog and compatibility logic into the library. Replace positional record access incrementally. Implement the IWADINFO catalog task below alongside scanner extraction.
-3. **Extract scanning and launching — workflow slice implemented.** Manual and Steam scanning use controller-owned workers with GUI-thread callbacks. The launcher accepts explicit inputs, has no parent-widget or settings access, uses a process working directory, and reports outcomes through Qt signals. Module moves remain pending.
+3. **Extract scanning and launching — implemented.** Manual and Steam scanning use controller-owned workers with GUI-thread callbacks. The launcher accepts explicit inputs, has no parent-widget or settings access, uses a process working directory, and reports outcomes through Qt signals. Workers and process adapters now live in services.
 4. **Extract controllers — launch, scan, selection, modpack, and runner slices implemented.** `LaunchController` owns launch validation and process outcomes, `ScanController` owns workers, `LibraryController` resolves runner/version choices, `ModpackController` owns editor/import drafts and JSON workflows, and `RunnerController` owns runner configuration, detection, validation, and persistence.
-5. **Move modules into packages.** Reduce `main.py` to application setup and component wiring. Update imports and build configuration as files move. Retain references to controllers, dialogs, and asynchronous services for their required lifetimes.
+5. **Move modules into packages — implemented.** `main.py` bootstraps the application; `views/main_window.py` contains the window and existing component wiring. Imports and build configuration follow the new packages. Existing controller, dialog, and asynchronous-service ownership is preserved.
 6. **Optionally adopt Qt model/view tables.** Keep `QTableWidget` during the initial refactor. Later, replace it with `QTableView` and a `QAbstractTableModel` adapter if that simplifies refreshes and selection handling.
 
 A Qt table model is a presentation adapter for the library records, not the entire MVC domain model. This optional step should not block separating workflows from widgets.
@@ -296,7 +317,7 @@ Unsupported upstream games, ZIP based IWADs, embedded definitions, companion
 requirements, and load ordering remain pending. Manual directory scans now use a
 Qt worker and GUI-thread signals for progress, refresh, and cleanup. Manual and
 Steam orchestration and launcher service/controller extraction are implemented;
-module moves remain pending.
+module moves are implemented.
 
 Replace the game-identification portion of `data.games` with definitions from
 [UZDoom's `wadsrc_extra/static/iwadinfo.txt`](https://github.com/UZDoom/UZDoom/blob/trunk/wadsrc_extra/static/iwadinfo.txt).
