@@ -4,14 +4,14 @@ on:
   workflow_dispatch:
   push:
     tags:
-      - 'v*'
+      - "v*"
   pull_request:
     paths:
-      - '.github/workflows/build.yml'
-      - 'packaging/**'
-      - 'src/**'
-      - 'tests/**'
-      - 'pytest.ini'
+      - ".github/workflows/build.yml"
+      - "packaging/**"
+      - "src/**"
+      - "tests/**"
+      - "pytest.ini"
 
 permissions:
   contents: read
@@ -38,7 +38,7 @@ jobs:
 
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.14'
+          python-version: "3.14"
           architecture: x64
           cache: pip
           cache-dependency-path: src/requirements.txt
@@ -103,3 +103,51 @@ jobs:
           name: BSL-linux-x86_64
           path: dist/BSL-linux-x86_64.AppImage
           if-no-files-found: error
+  release:
+    name: Publish release assets
+    needs: build
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    concurrency:
+      group: release-${{ github.ref }}
+      cancel-in-progress: false
+    steps:
+      - name: Download Windows build
+        uses: actions/download-artifact@v4
+        with:
+          name: BSL-windows-x64
+          path: artifacts/windows
+
+      - name: Download Linux AppImage
+        uses: actions/download-artifact@v4
+        with:
+          name: BSL-linux-x86_64
+          path: artifacts/linux
+
+      - name: Prepare release assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f artifacts/windows/BSL.exe
+          test -s artifacts/linux/BSL-linux-x86_64.AppImage
+          mkdir -p release-assets
+          (cd artifacts/windows && zip -r ../../release-assets/BSL-windows-x64.zip .)
+          cp artifacts/linux/BSL-linux-x86_64.AppImage release-assets/
+
+      - name: Create release if needed and upload assets
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          if ! gh release view "$RELEASE_TAG" > /dev/null 2>&1; then
+            gh release create "$RELEASE_TAG" --verify-tag --generate-notes --title "$RELEASE_TAG"
+          fi
+          gh release upload "$RELEASE_TAG" \
+            release-assets/BSL-windows-x64.zip \
+            release-assets/BSL-linux-x86_64.AppImage --clobber

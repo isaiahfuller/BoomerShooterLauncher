@@ -21,10 +21,32 @@ Neither output includes games or source ports.
      ./BSL-linux-x86_64.AppImage
      ```
 
-Pushing a `v*` tag also builds both platforms. Relevant pull requests run the
-same checks. These are workflow artifacts subject to GitHub's retention policy,
-not automatically published GitHub Releases. They are not code-signed; Windows
-may display an unknown-publisher warning.
+Pushing a `v*` tag builds both platforms and, after both succeed, automatically
+uploads `BSL-windows-x64.zip` and `BSL-linux-x86_64.AppImage` to the matching GitHub
+Release. If the release does not exist, the workflow creates a published release
+with generated notes. Existing release descriptions and draft/prerelease status
+are preserved. Rerunning the tag workflow replaces assets with these same names;
+other release assets are left untouched.
+
+For example, after committing the changes you want to release:
+
+```sh
+git tag v1.1.0
+git push origin v1.1.0
+```
+
+Use a new version tag for each release. Tag names do not automatically update the
+application version in `src/setup.py`; update that separately when appropriate.
+The tagged commit must contain the release-enabled workflow. Publishing an
+existing tag through the GitHub Releases UI alone does not trigger this workflow.
+
+Manual runs (even on a tag) and relevant pull requests only produce Actions
+artifacts, which are subject to GitHub's retention policy. Automatic publishing
+runs only on tag pushes, with `contents: write` granted to the release job alone.
+If a build or test fails, publishing is skipped. If only publishing fails, rerun
+the failed job while the build artifacts are still available.
+
+The builds are not code-signed; Windows may display an unknown-publisher warning.
 
 GitHub artifacts do not preserve executable permissions, so Linux users must
 run `chmod +x` after downloading. No separate Python installation is required.
