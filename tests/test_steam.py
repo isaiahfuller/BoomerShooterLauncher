@@ -41,7 +41,8 @@ class SteamTests(unittest.TestCase):
         )
         (primary / "steamapps/common/Unregistered").mkdir()
         self.assertEqual(
-            installed_game_directories([primary, primary]), sorted([first, second])
+            installed_game_directories([primary, primary]),
+            sorted([first.resolve(), second.resolve()])
         )
 
     def test_legacy_libraries_and_bad_manifest_are_tolerated(self):
@@ -57,7 +58,7 @@ class SteamTests(unittest.TestCase):
             '"AppState" { "installdir" "../.." }'
         )
         with self.assertLogs("services.steam", level="WARNING"):
-            self.assertEqual(installed_game_directories([primary]), [expected])
+            self.assertEqual(installed_game_directories([primary]), [expected.resolve()])
         self.assertEqual(installed_game_directories([]), [])
 
     def test_parser_preserves_windows_paths_and_comments(self):
@@ -81,7 +82,7 @@ class SteamTests(unittest.TestCase):
                 "os.environ", {"XDG_DATA_HOME": str(self.root / ".local/share")}
             ),
         ):
-            self.assertEqual(set(steam_roots()), {native, flatpak})
+            self.assertEqual(set(steam_roots()), {native.resolve(), flatpak.resolve()})
 
     def test_worker_scans_supported_files_and_reports_results(self):
         install = self.install(self.root / "Steam", 1, "Doom")
@@ -102,7 +103,7 @@ class SteamTests(unittest.TestCase):
             worker.run()
         self.assertEqual(results, [(1, 1, 0)])
         releases = repo.games()["Doom"]["releases"]
-        self.assertEqual(next(iter(releases.values()))["path"], str(wad))
+        self.assertEqual(next(iter(releases.values()))["path"], str(wad.resolve()))
         checksum = format(zlib.crc32(wad.read_bytes()), "x")
         with patch("services.game_files.data.gameBlacklist", [checksum]):
             self.assertFalse(scan_game_file(wad, repo))

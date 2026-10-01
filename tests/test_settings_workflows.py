@@ -159,7 +159,7 @@ class SettingsWorkflowTests(unittest.TestCase):
                 wad.write_bytes(b'test WAD fixture, unknown CRC')
                 scanner = GameScanner(window)
                 scanner.individualFile(str(wad))
-                assert any(release['path'] == str(wad) for game in repo.games().values()
+                assert any(release['path'] == str(wad.resolve()) for game in repo.games().values()
                            for release in game['releases'].values())
                 scanner.deleteLater()
                 with patch('services.steam_scanner.installed_game_directories', return_value=[Path(directory)]):

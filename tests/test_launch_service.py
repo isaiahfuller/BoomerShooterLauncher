@@ -36,14 +36,16 @@ class LaunchServiceTests(unittest.TestCase):
 
     def test_process_uses_its_own_working_directory(self):
         with tempfile.TemporaryDirectory() as directory:
-            script = Path(directory) / 'runner.sh'
-            script.write_text('#!/bin/sh\npwd > result.txt\nexit 0\n')
-            script.chmod(0o755)
+            script = Path(directory) / 'runner.py'
+            script.write_text(
+                "from pathlib import Path\n"
+                "Path('result.txt').write_text(str(Path.cwd()), encoding='utf-8')\n"
+            )
             save_directory = Path(directory) / 'saves'
-            command = LaunchCommand(str(script), ('-iwad', '/games/doom.wad',
-                                                   '-savedir', str(save_directory)),
+            command = LaunchCommand(sys.executable, (str(script), '-iwad', '/games/doom.wad',
+                                                     '-savedir', str(save_directory)),
                                     save_directory)
-            request = LaunchRequest('Doom', '/games/doom.wad', 'Port', str(script))
+            request = LaunchRequest('Doom', '/games/doom.wad', 'Port', sys.executable)
             original_directory = os.getcwd()
             process = GameLauncher()
             with patch('services.launcher.build_launch_command', return_value=command):
@@ -51,8 +53,9 @@ class LaunchServiceTests(unittest.TestCase):
                 self.assertTrue(process.waitForFinished(5000))
             self.assertEqual(process.exitCode(), 0)
             self.assertEqual(process.workingDirectory(), str(save_directory))
-            self.assertEqual((save_directory / 'result.txt').read_text().strip(),
-                             str(save_directory))
+            self.assertEqual(
+                Path((save_directory / 'result.txt').read_text(encoding='utf-8')).resolve(),
+                save_directory.resolve())
             self.assertEqual(os.getcwd(), original_directory)
 
 

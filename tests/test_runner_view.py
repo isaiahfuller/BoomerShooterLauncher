@@ -45,8 +45,12 @@ class RunnerViewTests(unittest.TestCase):
             self.view.runnerList.findItems(name, QtCore.Qt.MatchExactly)[0])
 
     def test_detects_path_and_saves_selected_runner(self):
-        program = self.program(self.executable)
-        with patch.dict(os.environ, {'PATH': str(self.root)}):
+        filename = self.executable + '.exe' if os.name == 'nt' else self.executable
+        program = self.program(filename)
+        environment = {'PATH': str(self.root)}
+        if os.name == 'nt':
+            environment['PATHEXT'] = '.exe'
+        with patch.dict(os.environ, environment):
             self.select(self.name)
             self.assertEqual(self.view.programPath.text(), str(program))
             self.assertEqual(self.repo.runners(), {})

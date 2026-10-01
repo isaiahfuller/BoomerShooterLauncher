@@ -83,14 +83,32 @@ class RunnerControllerTests(unittest.TestCase):
         self.assertTrue(self.controller.remove())
         self.assertEqual(self.repo.runners(), {})
 
-    def test_invalid_missing_directory_and_nonexecutable_do_not_save(self):
+    def test_missing_file_and_directory_do_not_save(self):
+        self.controller.select(None, custom=True)
+        for path in (str(self.root / 'missing'), str(self.root)):
+            self.controller.change_path(path)
+            self.assertIsNone(self.controller.save())
+        self.assertEqual(len(self.errors), 2)
+        self.assertEqual(self.repo.runners(), {})
+
+    def test_denied_execute_access_does_not_save(self):
+        self.controller.select(None, custom=True)
+        path = self.program()
+        self.controller.change_path(path)
+        with patch('controllers.runner_controller.os.access', return_value=False) as access:
+            self.assertIsNone(self.controller.save())
+        access.assert_called_once_with(Path(path), os.X_OK)
+        self.assertEqual(len(self.errors), 1)
+        self.assertEqual(self.repo.runners(), {})
+
+    @unittest.skipUnless(os.name == 'posix', 'Requires POSIX executable permission bits')
+    def test_nonexecutable_permission_bits_do_not_save(self):
         self.controller.select(None, custom=True)
         nonexecutable = Path(self.program())
         nonexecutable.chmod(0o644)
-        for path in (str(self.root / 'missing'), str(self.root), str(nonexecutable)):
-            self.controller.change_path(path)
-            self.assertIsNone(self.controller.save())
-        self.assertEqual(len(self.errors), 3)
+        self.controller.change_path(str(nonexecutable))
+        self.assertIsNone(self.controller.save())
+        self.assertEqual(len(self.errors), 1)
         self.assertEqual(self.repo.runners(), {})
 
     def test_persistence_errors_do_not_emit_success_or_clear_selection(self):

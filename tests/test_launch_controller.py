@@ -50,12 +50,11 @@ class LaunchControllerTests(unittest.TestCase):
 
     def test_real_process_exit_reaches_controller_signals(self):
         with tempfile.TemporaryDirectory() as directory:
-            script = Path(directory) / 'runner.sh'
-            script.write_text('#!/bin/sh\nexit 7\n')
-            script.chmod(0o755)
-            command = LaunchCommand(str(script), ('-iwad', self.version.path),
+            script = Path(directory) / 'runner.py'
+            script.write_text('import sys\nsys.exit(7)\n')
+            command = LaunchCommand(sys.executable, (str(script), '-iwad', self.version.path),
                                     Path(directory) / 'saves')
-            runner = Runner('UZDoom', str(script), 'uzdoom')
+            runner = Runner('UZDoom', sys.executable, 'uzdoom')
             events = []
             self.controller.started.connect(lambda *args: events.append('started'))
             self.controller.stopped.connect(lambda: events.append('stopped'))
