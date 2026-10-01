@@ -104,6 +104,99 @@ class IWadDetectionTests(unittest.TestCase):
             self.assertEqual(repository.saved[0][0], 'Doom')
             self.assertEqual(repository.saved[1]['label'], 'DOOM: KEX Edition')
 
+    def test_doom_editions_use_content_with_standard_and_alias_filenames(self):
+        from unittest.mock import Mock
+
+        catalog = bundled_catalog()
+        with tempfile.TemporaryDirectory() as temp:
+            for prefix, filename, base in (
+                ('DOOM:', 'doom.wad', 'Doom'),
+                ('DOOM 2:', 'doom2.wad', 'Doom II: Hell on Earth'),
+            ):
+                for edition in ('KEX', 'Unity', 'BFG', 'XBox'):
+                    label = f'{prefix} {edition} Edition'
+                    rule = next(rule for rule in catalog.definitions if rule.name == label)
+                    for name in (filename, filename.upper(), rule.filename, 'renamed.wad'):
+                        with self.subTest(label=label, filename=name):
+                            path = Path(temp) / name
+                            make_wad(path, rule.must_contain)
+                            if label == 'DOOM 2: XBox Edition' and name == 'renamed.wad':
+                                self.assertIsNone(detect_wad(path))
+                                continue
+                            self.assertEqual(detect_wad(path).name, label)
+                            repository = Mock()
+                            self.assertTrue(scan_game_file(path, repository))
+                            args, kwargs = repository.save_game.call_args
+                            self.assertEqual(args[0], base)
+                            self.assertEqual(kwargs['label'], label)
+
+    def test_megawad_with_map33_is_not_xbox_doom(self):
+        from unittest.mock import Mock
+
+        with tempfile.TemporaryDirectory() as temp:
+            for magic in (b'PWAD', b'IWAD'):
+                with self.subTest(magic=magic):
+                    path = Path(temp) / 'AR.wad'
+                    make_wad(path, ['MAP01', 'MAP33', 'CWILV32'])
+                    with path.open('r+b') as stream:
+                        stream.write(magic)
+                    self.assertIsNone(detect_wad(path))
+                    repository = Mock()
+                    self.assertFalse(scan_game_file(path, repository))
+                    repository.save_game.assert_not_called()
+
+    def test_generic_maps_do_not_match_edition_aliases(self):
+        with tempfile.TemporaryDirectory() as temp:
+            for filename, entries in (
+                ('doomkex.wad', ['E1M1']),
+                ('doom2kex.wad', ['MAP01']),
+                ('custom_map.wad', ['MAP01']),
+            ):
+                with self.subTest(filename=filename):
+                    path = Path(temp) / filename
+                    make_wad(path, entries)
+                    self.assertIsNone(detect_wad(path))
+
+    def test_editions_without_iwadname_keep_specific_labels(self):
+        from unittest.mock import Mock
+        import data
+
+        cases = (
+            ('DOOM Shareware', 'doom1.wad', 'doom.wad'),
+            ('Heretic Shareware', 'heretic1.wad', 'heretic.wad'),
+            ('Hexen: Demo Version', 'hexen.wad', 'hexen.wad'),
+            ('Strife: Teaser (New Version)', 'strife0.wad', 'strife1.wad'),
+            ('Strife: Teaser (Old Version)', 'strife0.wad', 'strife1.wad'),
+            ('Freedoom: Demo Version', 'freedoom1.wad', 'freedoom1.wad'),
+        )
+        with tempfile.TemporaryDirectory() as temp:
+            for label, filename, legacy_filename in cases:
+                with self.subTest(label=label):
+                    rule = next(rule for rule in bundled_catalog().definitions
+                                if rule.name == label)
+                    self.assertIsNone(rule.filename)
+                    path = Path(temp) / filename
+                    make_wad(path, rule.must_contain)
+                    repository = Mock()
+                    self.assertTrue(scan_game_file(path, repository))
+                    args, kwargs = repository.save_game.call_args
+                    base = data.games[legacy_filename]['name']
+                    self.assertEqual(args[0], base)
+                    self.assertTrue(args[1].startswith(base + ' vUnk-'))
+                    self.assertEqual(kwargs['label'], label)
+
+    def test_unmapped_expansion_is_not_treated_as_base_game(self):
+        from unittest.mock import Mock
+
+        rule = next(rule for rule in bundled_catalog().definitions
+                    if rule.name == 'Hexen: Deathkings of the Dark Citadel')
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / 'hexdd.wad'
+            make_wad(path, rule.must_contain)
+            repository = Mock()
+            self.assertFalse(scan_game_file(path, repository))
+            repository.save_game.assert_not_called()
+
     def test_bad_directory(self):
         with tempfile.TemporaryDirectory() as temp:
             path = Path(temp) / 'bad.wad'

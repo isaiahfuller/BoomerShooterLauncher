@@ -33,13 +33,20 @@ def detect_wad(path, catalog=None):
     entries = wad_entries(path)
     filename = Path(path).name.lower()
     for definition in (catalog or bundled_catalog()).definitions:
-        # The official Doom rules can match ordinary map packs, especially the
-        # Doom II rule whose only required lump is MAP01.
-        if (definition.name.startswith(('DOOM:', 'DOOM 2:')) or
-                definition.name in ('The Ultimate DOOM', 'DOOM Registered', 'DOOM Shareware')):
+        # Generic Doom rules can match ordinary map packs, especially the
+        # Doom II rule whose only required lump is MAP01. Edition-specific
+        # rules instead identify content: Steam also ships KEX/Unity/BFG
+        # editions as doom.wad or doom2.wad, not their IWADName aliases.
+        if definition.name in ('DOOM 2: Hell on Earth', 'The Ultimate DOOM',
+                               'DOOM Registered', 'DOOM Shareware'):
             expected = definition.filename or 'doom1.wad'  # Shareware has no IWADName.
             if filename != expected.lower():
                 continue
+        # MAP33 and its title graphic also occur in community megawads
+        # (e.g. Anomaly Report), so the Xbox Doom II rule is not distinctive.
+        if (definition.name == 'DOOM 2: XBox Edition' and
+                filename not in ('doom2.wad', 'doom2xbox.wad')):
+            continue
         if set(definition.must_contain).issubset(entries):
             logging.getLogger(__name__).debug("Identified %s as %s", path, definition.name)
             return definition

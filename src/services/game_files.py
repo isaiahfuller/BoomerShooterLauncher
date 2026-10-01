@@ -22,6 +22,18 @@ _IWAD_LEGACY_HINTS = {
     'plutoniaunity.wad': 'plutonia.wad',
 }
 
+# These standalone editions have no IWADName in the bundled catalog.
+# Map explicitly rather than using Game, which also covers unrelated games
+# and expansions requiring additional files.
+_IWAD_EDITION_HINTS = {
+    'DOOM Shareware': 'doom.wad',
+    'Heretic Shareware': 'heretic.wad',
+    'Hexen: Demo Version': 'hexen.wad',
+    'Strife: Teaser (New Version)': 'strife1.wad',
+    'Strife: Teaser (Old Version)': 'strife1.wad',
+    'Freedoom: Demo Version': 'freedoom1.wad',
+}
+
 
 def _catalog_game(path):
     if path.suffix.lower() != '.wad':
@@ -33,7 +45,7 @@ def _catalog_game(path):
     if definition is None:
         return None
     # Preserve existing settings identities and runner compatibility.
-    hint = (definition.filename or '').lower()
+    hint = (definition.filename or _IWAD_EDITION_HINTS.get(definition.name, '')).lower()
     game = data.games.get(_IWAD_LEGACY_HINTS.get(hint, hint))
     return (game, definition.name) if game else None
 
