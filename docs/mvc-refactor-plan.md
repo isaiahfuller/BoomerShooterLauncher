@@ -8,7 +8,8 @@ Status: persistence centralization and the initial domain-model slice are implem
 group, key, and array access. The main window, game list, runner editor, modpack
 editor/importer, scanner, and launcher use repository methods for persistence.
 Dictionary APIs remain for callers awaiting migration; the library adapter supplies
-domain records. Controllers remain a future step.
+domain records. Launch, scan, library selection, and modpack controllers now own
+these workflow slices; runner editing remains pending.
 
 The repository preserves the Windows organization/application names
 `Isaiah Fuller` / `Boomer Shooter Launcher` and the Linux names
@@ -84,11 +85,11 @@ Validated with 24 isolated-settings/offscreen tests, including export followed b
 editing, removal to empty, cancelled and saved renames, duplicate import filenames,
 and runner identity after display-label changes.
 
-Next: complete the IWADINFO compatibility mappings and scanner workflow extraction.
+Next: extract runner editing workflows, then move modules into packages.
 The launcher service accepts an explicit request and owns command construction
 and process setup. `LaunchController` now validates selections, saves remembered
-choices, owns the process lifetime, and reports outcomes through signals. Other
-controllers (including JSON workflow extraction) and widget moves remain pending.
+choices, owns the process lifetime, and reports outcomes through signals. Runner
+editing controller extraction and widget moves remain pending.
 
 ## Implemented: scan controller ownership
 
@@ -102,11 +103,34 @@ the status bar, preserving the current launch and Discord state.
 
 The old `GameScanner` API remains as a compatibility adapter; production UI paths
 no longer instantiate it. Worker classes remain in their existing modules pending
-the package move. IWAD archive/dependency support and the remaining library and
-modpack controllers are still pending.
+the package move. IWAD archive/dependency support remains pending.
 
 Validated with injected disposable settings, multiple dropped files, GUI-thread
 callbacks, repeated Steam requests, shutdown, and existing workflow tests.
+
+## Implemented: library selection controller
+
+`LibraryController` resolves compatible runners and installed versions from one
+repository library snapshot and the selected record's remembered choices. It emits
+records to the main window, which only renders labels, enabled states, and item data.
+Selection changes and scan-driven table refreshes use this controller; compatibility
+entry points remain for existing dialog callers. Settings identities and model
+compatibility rules are unchanged. Runner editing and module moves remain pending.
+
+## Implemented: modpack controller and JSON boundary
+
+`ModpackController` owns immutable editor/import drafts, ordered file changes,
+row-based path resolution, persistence, removal, and remembered-selection migration
+on rename. Dialogs choose paths and render records; compatibility entry points
+remain available. Views reuse their parent's repository when supplied.
+
+`services.modpack_json` validates portable imports and converts JSON to unresolved
+records. Export omits local paths without mutating the draft. `MainWindow` submits
+an import path to the controller rather than reading JSON itself. Invalid JSON,
+unreadable files, and persistence/export errors are reported to the views; imports
+cannot be saved until all entries have paths. Duplicate filenames remain independent.
+
+Runner editing controller extraction and module/package movement are next.
 
 ## Purpose
 
@@ -187,16 +211,16 @@ Scanning should keep the interface responsive. Worker results must return to the
 
 ## Mapping existing behavior
 
-| Current behavior | Proposed owner |
-| --- | --- |
-| `MainWindow.getRunners()` and `getVersions()` | Library controller requests compatible choices from the model and updates the view |
-| `MainWindow.launchGame()` | Launch controller resolves selections and invokes the launcher service |
-| `GamesView.refresh()` and `loadModpacks()` reading settings | Repository loads records; view displays supplied records |
-| Settings access spread across dialogs | Settings repository |
-| Modpack editing, saving, importing, and exporting | Modpack controller coordinates model changes and persistence; JSON handling stays outside widgets |
-| `GameScanner` file dialog and scanning | View chooses paths; scanner service identifies files; controller coordinates saving and refresh |
-| `GameLauncher.processFinished()` displaying errors | Service reports completion; controller asks the view to display an error |
-| Discord updates in `MainWindow` | Controller coordinates the Discord service with application events |
+| Current behavior                                            | Proposed owner                                                                                    |
+| ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| `MainWindow.getRunners()` and `getVersions()`               | Library controller requests compatible choices from the model and updates the view                |
+| `MainWindow.launchGame()`                                   | Launch controller resolves selections and invokes the launcher service                            |
+| `GamesView.refresh()` and `loadModpacks()` reading settings | Repository loads records; view displays supplied records                                          |
+| Settings access spread across dialogs                       | Settings repository                                                                               |
+| Modpack editing, saving, importing, and exporting           | Modpack controller coordinates model changes and persistence; JSON handling stays outside widgets |
+| `GameScanner` file dialog and scanning                      | View chooses paths; scanner service identifies files; controller coordinates saving and refresh   |
+| `GameLauncher.processFinished()` displaying errors          | Service reports completion; controller asks the view to display an error                          |
+| Discord updates in `MainWindow`                             | Controller coordinates the Discord service with application events                                |
 
 ## Example: launching a game
 
@@ -233,8 +257,8 @@ The launch service no longer depends on `self.parent().gameList.game` or changes
 
 1. **Centralize persistence — implemented.** Introduce the settings repository and route existing settings access through it. Preserve the stored format and platform-specific configuration names. Keep the current widgets in place.
 2. **Introduce explicit models — initial slice implemented.** Define game, installed-version, runner, and modpack objects. Move static metadata into the catalog and compatibility logic into the library. Replace positional record access incrementally. Implement the IWADINFO catalog task below alongside scanner extraction.
-3. **Extract scanning and launching — in progress.** Manual directory scanning uses a Qt worker with GUI-thread callbacks. The launcher accepts explicit inputs, has no parent-widget or settings access, uses a process working directory, and reports outcomes through Qt signals. Finish scanner workflow extraction and controller ownership.
-4. **Extract controllers — launch slice implemented.** `LaunchController` owns launch validation, remembered selections, and process outcomes; the main window emits launch intent and handles display signals. Move runner/version population, scanning, and modpack workflows out of widgets next.
+3. **Extract scanning and launching — workflow slice implemented.** Manual and Steam scanning use controller-owned workers with GUI-thread callbacks. The launcher accepts explicit inputs, has no parent-widget or settings access, uses a process working directory, and reports outcomes through Qt signals. Module moves remain pending.
+4. **Extract controllers — launch, scan, selection, and modpack slices implemented.** `LaunchController` owns launch validation and process outcomes, `ScanController` owns workers, `LibraryController` resolves runner/version choices, and `ModpackController` owns editor/import drafts and JSON workflows. Move runner editing out of widgets next.
 5. **Move modules into packages.** Reduce `main.py` to application setup and component wiring. Update imports and build configuration as files move. Retain references to controllers, dialogs, and asynchronous services for their required lifetimes.
 6. **Optionally adopt Qt model/view tables.** Keep `QTableWidget` during the initial refactor. Later, replace it with `QTableView` and a `QAbstractTableModel` adapter if that simplifies refreshes and selection handling.
 
@@ -255,8 +279,9 @@ for remembered selections and modpacks. CRC version metadata and blacklist check
 still run for both methods.
 Unsupported upstream games, ZIP based IWADs, embedded definitions, companion
 requirements, and load ordering remain pending. Manual directory scans now use a
-Qt worker and GUI-thread signals for progress, refresh, and cleanup; broader
-scanner workflow extraction and launcher service extraction remain pending.
+Qt worker and GUI-thread signals for progress, refresh, and cleanup. Manual and
+Steam orchestration and launcher service/controller extraction are implemented;
+module moves remain pending.
 
 Replace the game-identification portion of `data.games` with definitions from
 [UZDoom's `wadsrc_extra/static/iwadinfo.txt`](https://github.com/UZDoom/UZDoom/blob/trunk/wadsrc_extra/static/iwadinfo.txt).

@@ -49,7 +49,8 @@ class ModDialogTests(unittest.TestCase):
     def test_export_keeps_paths_and_reordering_keeps_metadata(self):
         view = self.editor()
         target = self.root / "pack.json"
-        with patch.object(QtWidgets.QFileDialog, "getSaveFileName", return_value=(str(target), "")):
+        with patch.object(QtWidgets.QFileDialog, "exec", return_value=QtWidgets.QDialog.Accepted), \
+                patch.object(QtWidgets.QFileDialog, "selectedFiles", return_value=[str(target)]):
             view.exportJson()
         self.assertEqual(view.mods, self.pack)
         self.assertEqual(json.loads(target.read_text())["mods"], [
@@ -96,3 +97,39 @@ class ModDialogTests(unittest.TestCase):
         pack = next(p for p in self.repo.library().modpacks if p.name == "Imported")
         self.assertEqual([f.path for f in pack.files], ["/replacement.pk3", "/two/same.pk3"])
         self.assertEqual([f.source for f in pack.files], ["one", "two"])
+
+    def test_record_import_reuses_repository_and_reports_save_failure(self):
+        self.parent.repository = self.repo
+        view = ModsImport(self.parent, self.pack)
+        self.assertIs(view.controller.repository, self.repo)
+        self.assertEqual(view.mods, self.pack.files)
+        with patch.object(self.repo, "save_modpack_record", side_effect=OSError("cannot save")), \
+                patch.object(view, "close") as close:
+            view.saveModpack()
+            close.assert_not_called()
+        self.assertEqual(view.status.currentMessage(), "cannot save")
+        self.parent.refresh.assert_not_called()
+
+    def test_export_defaults_to_json_extension(self):
+        view = self.editor()
+        target = self.root / "pack"
+
+        def accept(chooser):
+            self.assertEqual(chooser.acceptMode(), QtWidgets.QFileDialog.AcceptSave)
+            self.assertEqual(chooser.defaultSuffix(), "json")
+            chooser.selectFile(str(target))
+            return QtWidgets.QDialog.Accepted
+
+        with patch.object(QtWidgets.QFileDialog, "exec", new=accept):
+            view.exportJson()
+        self.assertFalse(target.exists())
+        self.assertEqual(json.loads(target.with_suffix(".json").read_text())["name"], "Pack")
+        self.assertEqual(view.mods, self.pack)
+
+    def test_cancelled_export_does_not_call_controller(self):
+        view = self.editor()
+        with patch.object(QtWidgets.QFileDialog, "exec", return_value=QtWidgets.QDialog.Rejected), \
+                patch.object(view.controller, "export_json") as export:
+            view.exportJson()
+            export.assert_not_called()
+        self.assertEqual(view.mods, self.pack)

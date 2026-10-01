@@ -1,6 +1,6 @@
 """A game launcher for old FPS games"""
 
-import json
+from controllers.modpack_controller import ModpackController
 import logging
 import platform
 import sys
@@ -8,6 +8,7 @@ import sys
 import qtawesome as qta
 from PySide6 import QtCore, QtGui, QtWidgets
 
+from controllers.library_controller import LibraryController
 from controllers.launch_controller import LaunchController
 from controllers.scan_controller import ScanController
 from discord import Discord
@@ -38,6 +39,8 @@ class MainWindow(QtWidgets.QMainWindow):
         self.theme = Theme(app.setStyleSheet)
 
         self.repository = SettingsRepository()
+        self.modpackController = ModpackController(self.repository, self)
+        self.modpackController.failed.connect(self._show_launch_error)
 
         self.readSettings()
         self.discord = Discord()
@@ -104,8 +107,9 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self.runnerToolbar.setStyleSheet("QToolBar{spacing: 5px;}")
 
-        self.gameList.itemSelectionChanged.connect(self.getRunners)
-        self.gameList.itemSelectionChanged.connect(self.getVersions)
+        self.libraryController = LibraryController(self.repository, self)
+        self.libraryController.choices_changed.connect(self._show_library_choices)
+        self.gameList.itemSelectionChanged.connect(self._request_library_choices)
 
         self.launchButton.clicked.connect(self.launchGame)
         self.gameList.cellActivated.connect(self.launchGame)
@@ -162,69 +166,45 @@ class MainWindow(QtWidgets.QMainWindow):
     def steamScanFailed(self, error):
         self.status.showMessage(f"Steam scan failed: {error}")
 
+    def _request_library_choices(self):
+        self.libraryController.select(self.gameList.selected_record)
+
     def getRunners(self):
-        """Add all compatible source ports to combobox"""
-        self.currentRunners.clear()
-        self.runnerCombobox.clear()
-        record = self.gameList.selected_record
-        if record is not None:
-            game = record.base if isinstance(record, Modpack) else record.family
-
-            self.game = game
-            is_modpack = isinstance(record, Modpack)
-            selection_name = record.name
-            lastRunner, _ = self.repository.last_selection(
-                selection_name, modpack=is_modpack
-            )
-            runners = self.repository.library().compatible_runners(
-                game, preferred=lastRunner
-            )
-            self.currentRunners.extend(runner.name for runner in runners)
-            self.logger.debug(f'Compatible runners for "{game}": {self.currentRunners}')
-            if len(self.currentRunners) == 0:
-                self.runnerCombobox.adjustSize()
-                self.runnerCombobox.setEnabled(False)
-                self.runnerCombobox.addItem("Add source port")
-            else:
-                self.runnerCombobox.adjustSize()
-                for runner in runners:
-                    self.runnerCombobox.addItem(runner.name, runner)
-
-                self.runnerCombobox.setEnabled(True)
-        else:
-            self.runnerCombobox.adjustSize()
-            self.runnerCombobox.setEnabled(False)
-            self.runnerCombobox.addItem("Select a game first")
+        """Compatibility entry point for refreshing selection choices."""
+        self._request_library_choices()
 
     def getVersions(self):
-        """Add all versions of the selected game to combobox"""
-        self.currentVersions.clear()
+        """Compatibility entry point for refreshing selection choices."""
+        self._request_library_choices()
+
+    def _show_library_choices(self, record, runners, versions):
+        """Render controller-supplied records; labels are presentation only."""
+        self.game = (
+            record.base if isinstance(record, Modpack) else record.family
+        ) if record is not None else None
+        self.currentRunners[:] = [runner.name for runner in runners]
+        self.currentVersions[:] = [version.name for version in versions]
+        self.runnerCombobox.clear()
+        for runner in runners:
+            self.runnerCombobox.addItem(runner.name, runner)
+        if not runners:
+            self.runnerCombobox.addItem(
+                "Select a game first" if record is None else "Add source port"
+            )
+        self.runnerCombobox.setEnabled(bool(runners))
+        self.runnerCombobox.adjustSize()
+
         self.versionCombobox.clear()
-        record = self.gameList.selected_record
-        if record is not None:
-            is_modpack = isinstance(record, Modpack)
-            selection_name = record.name
-            _, lastVersion = self.repository.last_selection(
-                selection_name, modpack=is_modpack
+        for version in versions:
+            label = (
+                f"{version.display_name} — {version.path}"
+                if version.path else version.display_name
             )
-            versions = self.repository.library().installed_versions(
-                selection_name, modpack=is_modpack, preferred=lastVersion
-            )
-            self.currentVersions.extend(version.name for version in versions)
-            for version in versions:
-                label = (
-                    f"{version.display_name} — {version.path}"
-                    if version.path
-                    else version.display_name
-                )
-                self.versionCombobox.addItem(label, version)
-            self.versionCombobox.adjustSize()
-            self.versionCombobox.setEnabled(bool(versions))
-            self.logger.debug(f'"{selection_name}" versions: {self.currentVersions}')
-        else:
-            self.versionCombobox.adjustSize()
-            self.versionCombobox.setEnabled(False)
+            self.versionCombobox.addItem(label, version)
+        if record is None:
             self.versionCombobox.addItem("Versions")
+        self.versionCombobox.setEnabled(bool(versions))
+        self.versionCombobox.adjustSize()
 
     def launchGame(self):
         """Emit launch intent from the view."""
@@ -263,18 +243,15 @@ class MainWindow(QtWidgets.QMainWindow):
         runnerList.showWindowFromMenu()
 
     def importModpack(self):
-        """Choose json file, open importer window"""
-        self.status.showMessage("Selecting a modpack to import...")
+        """Choose a JSON file and render the controller's unresolved draft."""
         chooser = QtWidgets.QFileDialog(self)
-        chooser.setFileMode(QtWidgets.QFileDialog.ExistingFiles)
+        chooser.setFileMode(QtWidgets.QFileDialog.ExistingFile)
         chooser.setNameFilter("Modpack JSON (*.json)")
         if chooser.exec():
-            pack_file = chooser.selectedFiles()[0]
-            with open(pack_file, encoding="utf-8") as jsonFile:
-                jsonData = json.load(jsonFile)
-                importView = ModsImport(self, jsonData)
+            pack = self.modpackController.load_json(chooser.selectedFiles()[0])
+            if pack is not None:
+                importView = ModsImport(self, pack)
                 importView.showWindow()
-        self.status.showMessage("Idle...")
 
     def dragEnterEvent(self, event):
         """Filters things dragged into window"""
