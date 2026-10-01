@@ -12,10 +12,14 @@ class SteamScanner(QtCore.QThread):
     completed = QtCore.Signal(int, int, int)
     failed = QtCore.Signal(str)
 
+    def __init__(self, parent=None, *, repository=None):
+        super().__init__(parent)
+        self.repository = repository
+
     def run(self):
         try:
             directories = installed_game_directories()
-            repository = SettingsRepository()
+            repository = self.repository if self.repository is not None else SettingsRepository()
             found = 0
             errors = 0
             seen = set()

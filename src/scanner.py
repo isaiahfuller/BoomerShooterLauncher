@@ -15,14 +15,17 @@ class DirectoryScanWorker(QtCore.QThread):
     """Scan files without touching widgets from the worker thread."""
     progress = QtCore.Signal(str)
 
-    def __init__(self, directory, parent=None):
+    def __init__(self, directory, parent=None, *, repository=None):
         super().__init__(parent)
         self.directory = directory
+        self.repository = repository
 
     def run(self):
-        repository = SettingsRepository()
+        repository = self.repository if self.repository is not None else SettingsRepository()
         logger = logging.getLogger('Game Scanner')
-        for parent, _, names in os.walk(self.directory):
+        entries = (os.walk(self.directory) if os.path.isdir(self.directory) else
+                   [(os.path.dirname(self.directory), [], [os.path.basename(self.directory)])])
+        for parent, _, names in entries:
             if self.isInterruptionRequested():
                 return
             for name in names:

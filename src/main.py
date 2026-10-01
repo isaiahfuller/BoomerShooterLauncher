@@ -10,8 +10,7 @@ from PySide6 import QtCore, QtWidgets, QtGui
 import qtawesome as qta
 from discord import Discord
 from games_view import GamesView
-from scanner import GameScanner
-from steam_scanner import SteamScanner
+from controllers.scan_controller import ScanController
 from runner_view import RunnerView
 from mods_view import ModsView
 from import_view import ModsImport
@@ -72,8 +71,15 @@ class MainWindow(QtWidgets.QMainWindow):
         fileToolbar.addAction(plusIcon, "&Add Games", self.gameScanner)
         self.steamScanAction = fileToolbar.addAction(
             "Find Steam Games", self.scanSteamGames)
-        self.steamScanner = None
-        self.directoryScanners = []
+        self.scanController = ScanController(self.repository, self)
+        self.scanController.progress.connect(self.status.showMessage)
+        self.scanController.library_changed.connect(self.gameList.refresh)
+        self.scanController.manual_finished.connect(
+            lambda: self.status.showMessage("Scan complete."))
+        self.scanController.steam_completed.connect(self.steamScanCompleted)
+        self.scanController.steam_failed.connect(self.steamScanFailed)
+        self.scanController.steam_busy.connect(
+            lambda busy: self.steamScanAction.setEnabled(not busy))
         fileToolbar.addAction(listIcon, "&New Modpack", self.showModWindow)
         fileToolbar.addAction(loadIcon, "&Import Modpack", self.importModpack)
 
@@ -132,31 +138,19 @@ class MainWindow(QtWidgets.QMainWindow):
             FirstRun(self).showWindow()
 
     def gameScanner(self):
-        """Scans files"""
-        self.status.showMessage("Scanning games...")
-        scanner = GameScanner(self)
-        if scanner.exec():
-            files = scanner.selectedFiles()
-            scanner.directoryCrawl(files[0], self.gameList.refresh)
-        self.clearStatus()
-        self.gameList.refresh()
-        scanner = None
+        """Choose a directory and submit it to the scan controller."""
+        directory = QtWidgets.QFileDialog.getExistingDirectory(self, "Add Games")
+        if directory:
+            self.scanController.scan_paths([directory])
+
+    @property
+    def steamScanner(self):
+        return self.scanController.steam_worker
 
     def scanSteamGames(self):
-        """Discover supported game files in installed Steam games."""
-        if self.steamScanner is not None:
-            return
-        self.steamScanAction.setEnabled(False)
-        self.status.showMessage("Finding installed Steam games…")
-        self.steamScanner = SteamScanner(self)
-        self.steamScanner.progress.connect(self.status.showMessage)
-        self.steamScanner.completed.connect(self.steamScanCompleted)
-        self.steamScanner.failed.connect(self.steamScanFailed)
-        self.steamScanner.finished.connect(self.steamScanFinished)
-        self.steamScanner.start()
+        self.scanController.scan_steam()
 
     def steamScanCompleted(self, installed, found, errors):
-        self.gameList.refresh()
         if not installed:
             message = "No installed Steam games found. Use Add Games to choose a folder manually."
         else:
@@ -166,13 +160,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.status.showMessage(message)
 
     def steamScanFailed(self, error):
-        self.gameList.refresh()
         self.status.showMessage(f"Steam scan failed: {error}")
-
-    def steamScanFinished(self):
-        self.steamScanner.deleteLater()
-        self.steamScanner = None
-        self.steamScanAction.setEnabled(True)
 
     def getRunners(self):
         """Add all compatible source ports to combobox"""
@@ -288,11 +276,8 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def dropEvent(self, event):
         """Scans files and folders dropped onto the window as games"""
-        scanner = GameScanner(self)
-        files = [u.toLocalFile() for u in event.mimeData().urls()]
-        for path in files:
-            scanner.directoryCrawl(path, self.gameList.refresh)
-            self.gameList.refresh()
+        self.scanController.scan_paths(
+            [url.toLocalFile() for url in event.mimeData().urls()])
         return super().dropEvent(event)
 
     def clearStatus(self):
@@ -309,12 +294,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def closeEvent(self, event: QtGui.QCloseEvent):
         """Saves settings before closing"""
-        if self.steamScanner is not None:
-            self.steamScanner.requestInterruption()
-            self.steamScanner.wait()
-        for worker in self.directoryScanners:
-            worker.requestInterruption()
-            worker.wait()
+        self.scanController.stop()
         self.launchController.stop()
         self.writeSettings()
         self.discord.clear()

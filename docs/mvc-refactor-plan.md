@@ -28,7 +28,7 @@ checks mock Discord, theme integration, and game process execution. Run from the
 repository root with the launcher dependencies installed:
 
 ```bash
-python -m unittest discover -s tests -v
+PYTHONPATH=src python -m unittest discover -s tests -v
 ```
 
 ## Implemented: initial domain models and library rules
@@ -89,6 +89,24 @@ The launcher service accepts an explicit request and owns command construction
 and process setup. `LaunchController` now validates selections, saves remembered
 choices, owns the process lifetime, and reports outcomes through signals. Other
 controllers (including JSON workflow extraction) and widget moves remain pending.
+
+## Implemented: scan controller ownership
+
+`ScanController` now owns manual and Steam workers, repository injection,
+progress, completion, and shutdown. The main window chooses directories, submits
+local dropped paths, and displays results through controller signals. Individual
+dropped files also run in workers, and each completed scan refreshes the library
+on the GUI thread. Steam requests are ignored while a Steam scan is already active;
+shutdown interrupts all workers before joining them. Manual completion only updates
+the status bar, preserving the current launch and Discord state.
+
+The old `GameScanner` API remains as a compatibility adapter; production UI paths
+no longer instantiate it. Worker classes remain in their existing modules pending
+the package move. IWAD archive/dependency support and the remaining library and
+modpack controllers are still pending.
+
+Validated with injected disposable settings, multiple dropped files, GUI-thread
+callbacks, repeated Steam requests, shutdown, and existing workflow tests.
 
 ## Purpose
 
