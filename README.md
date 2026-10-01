@@ -11,6 +11,7 @@ is in an undiscovered location, use **Add Games** to select its game folder manu
 ## Documentation
 
 - [MVC refactor plan](docs/mvc-refactor-plan.md)
+- [Windows builds and Linux AppImages](docs/building.md)
 
 <details>
 <summary>Screenshots</summary>
@@ -23,10 +24,15 @@ is in an undiscovered location, use **Add Games** to select its game folder manu
 
 **Running** - Requires Python 3.14 or higher
 
-    pip install -r requirements.txt
-    python main.py
+From the repository root:
+
+    python -m pip install -r src/requirements.txt
+    python src/main.py
 
 **Building** - Requires Python 3.14
 
-    pip install -r requirements.txt
-    python setup.py build
+    python -m pip install -r src/requirements.txt
+    python src/setup.py build
+
+GitHub Actions builds a Windows application folder and a Linux x86_64 AppImage.
+See [the build guide](docs/building.md) for downloads, local packaging, and limitations.

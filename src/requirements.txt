@@ -9,4 +9,4 @@ pyqtdarktheme
 qtawesome
 darkdetect
 pytest
-cx_Freeze
+cx_Freeze==8.7.1

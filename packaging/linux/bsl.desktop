@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Boomer Shooter Launcher
+Comment=Launch classic FPS games and mods
+Exec=boomershooterlauncher
+Icon=bsl
+Categories=Game;
+Terminal=false

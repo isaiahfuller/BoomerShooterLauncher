@@ -1,0 +1,5 @@
+#!/bin/sh
+# Preserve the caller's working directory and environment for external games.
+set -eu
+APPDIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+exec "$APPDIR/boomershooterlauncher" "$@"
