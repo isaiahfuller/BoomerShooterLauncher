@@ -1,6 +1,31 @@
 # MVC refactor plan
 
-Status: persistence centralization and the initial domain-model slice are implemented. Remaining MVC migration is incremental.
+Status: core MVC implementation complete. Automated validation passes; manual GUI
+and frozen-build release checks remain outstanding.
+
+## Implemented: final view boundaries and presence ownership
+
+`LibraryController.refresh()` loads the library and publishes family-grouped records.
+`GamesView` renders supplied records, preserves selection by type and persisted name,
+and emits refresh and context-menu intents. It no longer constructs a repository or
+loads settings. Production dialogs share the window's repository; modpack actions
+receive explicit records, and importer/editor/runner refreshes use signals.
+Legacy table-parented modpack entry points remain as compatibility adapters.
+
+`PresenceController` owns the Discord timer, playing/idle state, updates, and
+idempotent shutdown. `MainWindow` wires workflow events and renders status messages;
+scan completion does not reset playing presence. QTableWidget remains intentional.
+
+Validation: 76 tests and 50 subtests pass with offscreen Qt, including controller-led
+refresh, record-identity restoration/removal, explicit context-menu records, shared
+repository use, and presence lifecycle. Python compilation and `git diff --check`
+pass. Manual interactive GUI smoke checks were not performed. Frozen builds could
+not be run because cx_Freeze and PyInstaller are not installed.
+
+IWADINFO edition labels remain display-only: saved identities, selections, modpack
+references and ordering are unchanged. Content-based KEX detection supports Steam's
+standard filenames; weak Xbox Doom II matches retain filename safeguards. Existing
+labels require rescanning, and stale false-positive entries are not auto-deleted.
 
 ## Implemented: QSettings repository
 
@@ -165,8 +190,8 @@ catalog imports, build-configuration syntax/resource checks, and `git diff --che
 Frozen builds were not run: cx_Freeze and PyInstaller are not installed. Manual
 GUI validation remains outstanding.
 
-Next: optional Qt model/view table adoption (step 6), or the separately scoped
-remaining IWAD archive/dependency work. Neither is required for this package move.
+Optional follow-ups: Qt model/view table adoption (step 6) and separately scoped
+IWAD archive/dependency work. Neither blocks completion of the core MVC refactor.
 
 ## Purpose
 
@@ -189,9 +214,8 @@ The project already separates several dialogs into view files, but presentation,
 src/
 ├── main.py                     # Create application and connect components
 ├── models/
-│   ├── game.py                 # Game and installed versions
-│   ├── runner.py               # Source port configuration
-│   ├── modpack.py              # Base game and ordered mod files
+│   ├── records.py              # Immutable games, versions, runners and modpacks
+│   ├── iwadinfo.py             # Offline IWADINFO parser and definitions
 │   ├── catalog.py              # IWADINFO definitions and supplemental metadata
 │   └── library.py              # Library state and compatibility rules
 ├── views/
@@ -203,7 +227,9 @@ src/
 │   ├── first_run_view.py       # Welcome and setup dialog
 │   └── theme.py
 ├── controllers/
-│   ├── library_controller.py   # Selection, scanning, runner/version choices
+│   ├── library_controller.py   # Library refresh and runner/version choices
+│   ├── scan_controller.py      # Worker ownership and scan orchestration
+│   ├── presence_controller.py  # Discord lifecycle and playing/idle state
 │   ├── launch_controller.py    # Launch workflow and process events
 │   ├── runner_controller.py    # Configure and save runners
 │   └── modpack_controller.py   # Edit, import, and export modpacks
@@ -292,7 +318,7 @@ The launch service no longer depends on `self.parent().gameList.game` or changes
 ## Incremental migration
 
 1. **Centralize persistence — implemented.** Introduce the settings repository and route existing settings access through it. Preserve the stored format and platform-specific configuration names. Keep the current widgets in place.
-2. **Introduce explicit models — initial slice implemented.** Define game, installed-version, runner, and modpack objects. Move static metadata into the catalog and compatibility logic into the library. Replace positional record access incrementally. Implement the IWADINFO catalog task below alongside scanner extraction.
+2. **Introduce explicit models — implemented.** Immutable records, catalog metadata, compatibility rules, and record-backed dialogs are in place. Dictionary adapters remain at compatibility and serialization boundaries. The initial IWADINFO WAD slice is implemented; format expansion below is a separate feature.
 3. **Extract scanning and launching — implemented.** Manual and Steam scanning use controller-owned workers with GUI-thread callbacks. The launcher accepts explicit inputs, has no parent-widget or settings access, uses a process working directory, and reports outcomes through Qt signals. Workers and process adapters now live in services.
 4. **Extract controllers — launch, scan, selection, modpack, and runner slices implemented.** `LaunchController` owns launch validation and process outcomes, `ScanController` owns workers, `LibraryController` resolves runner/version choices, `ModpackController` owns editor/import drafts and JSON workflows, and `RunnerController` owns runner configuration, detection, validation, and persistence.
 5. **Move modules into packages — implemented.** `main.py` bootstraps the application; `views/main_window.py` contains the window and existing component wiring. Imports and build configuration follow the new packages. Existing controller, dialog, and asynchronous-service ownership is preserved.

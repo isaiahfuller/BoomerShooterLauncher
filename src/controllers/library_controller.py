@@ -6,6 +6,18 @@ from models.records import Modpack
 
 class LibraryController(QtCore.QObject):
     choices_changed = QtCore.Signal(object, object, object)
+    records_changed = QtCore.Signal(object)
+
+    def refresh(self):
+        """Publish records grouped by installed base family."""
+        library = self.repository.library()
+        rows = []
+        last = {game.family: game for game in library.games}
+        for game in library.games:
+            rows.append(game)
+            if game == last[game.family]:
+                rows.extend(pack for pack in library.modpacks if pack.base == game.family)
+        self.records_changed.emit(tuple(rows))
 
     def __init__(self, repository, parent=None):
         super().__init__(parent)

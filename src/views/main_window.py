@@ -11,6 +11,7 @@ from PySide6 import QtCore, QtGui, QtWidgets
 from controllers.library_controller import LibraryController
 from controllers.launch_controller import LaunchController
 from controllers.scan_controller import ScanController
+from controllers.presence_controller import PresenceController
 from services.discord import Discord
 from views.first_run_view import FirstRun
 from views.games_view import GamesView
@@ -44,6 +45,8 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self.readSettings()
         self.discord = Discord()
+        self.presenceController = PresenceController(self.discord, self)
+        self.presenceController.status_changed.connect(self.status.showMessage)
 
         self.gameList = GamesView(self)
         self.launchController = LaunchController(self.repository, self)
@@ -53,12 +56,8 @@ class MainWindow(QtWidgets.QMainWindow):
         self.launchController.failed.connect(self._show_launch_error)
         self.launchController.runners_needed.connect(self._open_runner_setup)
         self.game = None
-        self.discordTimer = QtCore.QTimer()
-        self.discordDetails = ""
-        self.discordState = ""
         self.currentRunners = []
         self.currentVersions = []
-        self.game_running = False
 
         iconColor = "grey"
         plusIcon = qta.icon("fa5s.plus", color=iconColor)
@@ -110,14 +109,17 @@ class MainWindow(QtWidgets.QMainWindow):
         self.libraryController = LibraryController(self.repository, self)
         self.libraryController.choices_changed.connect(self._show_library_choices)
         self.gameList.itemSelectionChanged.connect(self._request_library_choices)
+        self.gameList.refresh_requested.connect(self.libraryController.refresh)
+        self.libraryController.records_changed.connect(self.gameList.render_records)
+        self.gameList.add_modpack_requested.connect(self.showModWindow)
+        self.gameList.edit_modpack_requested.connect(self.editModpack)
+        self.gameList.remove_modpack_requested.connect(self.removeModpack)
+        self.libraryController.refresh()
 
         self.launchButton.clicked.connect(self.launchGame)
         self.gameList.cellActivated.connect(self.launchGame)
 
-        self.discordTimer.start(30 * 1000)
-        self.discordTimer.timeout.connect(self.updateStatus)
-        self.clearStatus()
-        self.updateStatus()
+        self.presenceController.start()
 
         self.setCentralWidget(self.gameList)
         self.setAcceptDrops(True)
@@ -219,27 +221,40 @@ class MainWindow(QtWidgets.QMainWindow):
         )
 
     def _launch_started(self, title, runner, version):
-        self.discordDetails = f"Playing {title} with {runner}"
-        self.discordState = version
-        self.game_running = True
-        self.updateStatus()
-        self.status.showMessage(f"{self.discordDetails} ({version})")
+        self.presenceController.playing(title, runner, version)
 
     def _show_launch_error(self, message):
         error_window = QtWidgets.QErrorMessage(self)
         error_window.showMessage(message)
 
     def _open_runner_setup(self, family):
-        RunnerView(self).showWindow(family)
+        view = RunnerView(self)
+        view.closed.connect(self._request_library_choices)
+        view.showWindow(family)
 
-    def showModWindow(self):
-        """Creates and displays the mod editor window"""
-        mod_list = ModsView(self.gameList)
-        mod_list.showWindow()
+    def showModWindow(self, record=None):
+        """Open a draft with explicit inputs and refresh wiring."""
+        editor = self._mod_editor()
+        if record and not isinstance(record, bool):
+            editor.baseSelect.setCurrentText(record.family or "")
+        editor.showWindow()
+
+    def _mod_editor(self):
+        editor = ModsView(self)
+        editor.refresh_requested.connect(self.libraryController.refresh)
+        return editor
+
+    def editModpack(self, record):
+        self._mod_editor().openFile(record)
+
+    def removeModpack(self, record):
+        if self.modpackController.remove(record):
+            self.libraryController.refresh()
 
     def showRunnerList(self):
         """Creates and displays the runner window"""
         runnerList = RunnerView(self)
+        runnerList.closed.connect(self._request_library_choices)
         runnerList.showWindowFromMenu()
 
     def importModpack(self):
@@ -251,6 +266,7 @@ class MainWindow(QtWidgets.QMainWindow):
             pack = self.modpackController.load_json(chooser.selectedFiles()[0])
             if pack is not None:
                 importView = ModsImport(self, pack)
+                importView.saved.connect(self.libraryController.refresh)
                 importView.showWindow()
 
     def dragEnterEvent(self, event):
@@ -268,22 +284,33 @@ class MainWindow(QtWidgets.QMainWindow):
         return super().dropEvent(event)
 
     def clearStatus(self):
-        """Changes status after game closes"""
-        self.discordState = "Idle..."
-        self.discordDetails = "Looking at games"
-        self.game_running = False
-        self.status.showMessage("Idle...")
-        self.updateStatus()
+        """Compatibility entry point for launch completion."""
+        self.presenceController.idle()
 
     def updateStatus(self):
-        """Updates status"""
-        self.discord.update(self.discordState, self.discordDetails)
+        self.presenceController.update()
+
+    @property
+    def game_running(self):
+        return self.presenceController.running
+
+    @property
+    def discordState(self):
+        return self.presenceController.state
+
+    @property
+    def discordDetails(self):
+        return self.presenceController.details
+
+    @property
+    def discordTimer(self):
+        return self.presenceController.timer
 
     def closeEvent(self, event: QtGui.QCloseEvent):
         """Saves settings before closing"""
         self.scanController.stop()
         self.launchController.stop()
         self.writeSettings()
-        self.discord.clear()
+        self.presenceController.stop()
         return super().closeEvent(event)
 

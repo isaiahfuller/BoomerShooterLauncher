@@ -8,6 +8,7 @@ from PySide6 import QtCore, QtWidgets, QtGui
 
 class ModsView(QtWidgets.QMainWindow):
     """Modpack editor window"""
+    refresh_requested = QtCore.Signal()
     def __init__(self, parent):
         super().__init__(parent=parent)
         self.setWindowModality(QtCore.Qt.ApplicationModal)
@@ -20,7 +21,10 @@ class ModsView(QtWidgets.QMainWindow):
 
         self.setWindowTitle("Modpack Builder")
 
-        self.gameList = self.parent()
+        # Compatibility adapter for callers still parenting the editor to a table.
+        self.gameList = parent if hasattr(parent, "selected_record") else None
+        if self.gameList is not None:
+            self.refresh_requested.connect(self.gameList.refresh)
 
         mainLayout = QtWidgets.QVBoxLayout()
         header = QtWidgets.QHBoxLayout()
@@ -224,7 +228,7 @@ class ModsView(QtWidgets.QMainWindow):
     def showWindow(self):
         """Displays the window"""
         self.setFixedSize(500, 500)
-        mainLocation = self.parent().parent().frameGeometry()
+        mainLocation = self.parent().window().frameGeometry()
         x = mainLocation.x() + mainLocation.width() / 2 - self.width() / 2
         y = mainLocation.y() + mainLocation.height() / 2 - self.height() / 2
         self.move(x, y)
@@ -232,13 +236,15 @@ class ModsView(QtWidgets.QMainWindow):
 
     def closeEvent(self, event: QtGui.QCloseEvent) -> None:
         """Refreshes game list while closing modpack menu"""
-        self.gameList.refresh()
+        self.refresh_requested.emit()
         self.deleteLater()
         return super().closeEvent(event)
 
-    def openFile(self):
-        """Render an existing draft supplied by the controller."""
-        pack = self.controller.open(self.gameList.selected_record)
+    def openFile(self, record=None):
+        """Render an explicitly supplied record (or a legacy table selection)."""
+        if record is None and self.gameList is not None:
+            record = self.gameList.selected_record
+        pack = self.controller.open(record)
         self.nameEdit.setText(pack.name)
         with QtCore.QSignalBlocker(self.baseSelect):
             if self.baseSelect.findText(pack.base or "") < 0:
@@ -247,9 +253,11 @@ class ModsView(QtWidgets.QMainWindow):
         self.refreshFiles(0 if pack.files else -1)
         self.showWindow()
 
-    def rmFile(self):
-        if self.controller.remove(self.gameList.selected_record):
-            self.gameList.refresh()
+    def rmFile(self, record=None):
+        if record is None and self.gameList is not None:
+            record = self.gameList.selected_record
+        if self.controller.remove(record):
+            self.refresh_requested.emit()
 
     def exportJson(self):
         """Choose a destination; the controller owns export."""

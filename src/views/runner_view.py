@@ -7,6 +7,7 @@ from PySide6 import QtCore, QtWidgets, QtGui
 
 class RunnerView(QtWidgets.QMainWindow):
     """Source port manager window and functions"""
+    closed = QtCore.Signal()
     def __init__(self, parent):
         super().__init__(parent=parent)
         self.setWindowModality(QtCore.Qt.ApplicationModal)
@@ -172,6 +173,6 @@ class RunnerView(QtWidgets.QMainWindow):
         """Refresh main window when closing"""
         self.runnerList.clear()
         self.openedFromMenu = False
-        self.parent().getRunners()
+        self.closed.emit()
         self.deleteLater()
         return super().closeEvent(event)

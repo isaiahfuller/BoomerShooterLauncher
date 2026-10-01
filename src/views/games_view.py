@@ -3,19 +3,21 @@ import logging
 
 from pathlib import Path
 from models.records import Game, Modpack
-from repositories.settings_repository import SettingsRepository
 from PySide6 import QtCore, QtWidgets
-from views.mods_view import ModsView
 
 class GamesView(QtWidgets.QTableWidget):
     """Displays games in a table"""
+    refresh_requested = QtCore.Signal()
+    add_modpack_requested = QtCore.Signal(object)
+    edit_modpack_requested = QtCore.Signal(object)
+    remove_modpack_requested = QtCore.Signal(object)
 
     def __init__(self, parent):
         super().__init__(parent=parent)
         self.status = parent.status
         self.logger = logging.getLogger("Game List")
         self.logger.debug("Building game list")
-        self.repository = SettingsRepository()
+        self.repository = parent.repository  # Compatibility for legacy dialog callers.
 
         self.setAlternatingRowColors(True)
         self.setWordWrap(False)
@@ -52,17 +54,13 @@ class GamesView(QtWidgets.QTableWidget):
         return record.name if record else ""
 
     def refresh(self):
-        """Render a library snapshot and restore selection by record identity."""
+        """Compatibility entry point: request a controller-owned refresh."""
+        self.refresh_requested.emit()
+
+    def render_records(self, rows):
+        """Render supplied records and restore selection by persisted identity."""
         selected = self.selected_record
         identity = (type(selected), selected.name) if selected else None
-        library = self.repository.library()
-        rows = []
-        last_in_family = {game.family: game for game in library.games}
-        for game in library.games:
-            rows.append(game)
-            # Place packs after the last installed game in their base family.
-            if game == last_in_family[game.family]:
-                rows.extend(pack for pack in library.modpacks if pack.base == game.family)
         blocker = QtCore.QSignalBlocker(self)
         self.clearContents()
         self.setRowCount(len(rows))
@@ -107,10 +105,9 @@ class GamesView(QtWidgets.QTableWidget):
             self.selectRow(item.row())
             record = item.data(QtCore.Qt.UserRole)
             self.menu = QtWidgets.QMenu(self)
-            modsView = ModsView(self)
             if isinstance(record, Modpack):
-                self.menu.addAction("Edit modpack", modsView.openFile)
-                self.menu.addAction("Remove modpack", modsView.rmFile)
+                self.menu.addAction("Edit modpack", lambda: self.edit_modpack_requested.emit(record))
+                self.menu.addAction("Remove modpack", lambda: self.remove_modpack_requested.emit(record))
             else:
-                self.menu.addAction("Add modpack", modsView.showWindow)
+                self.menu.addAction("Add modpack", lambda: self.add_modpack_requested.emit(record))
         return super().eventFilter(qobject, event)

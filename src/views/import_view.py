@@ -9,6 +9,7 @@ from PySide6 import QtCore, QtWidgets, QtGui
 
 class ModsImport(QtWidgets.QMainWindow):
     """Modpack importer"""
+    saved = QtCore.Signal()
     def __init__(self, parent, data):
         super().__init__(parent=parent)
         parent = self.parent()
@@ -157,7 +158,7 @@ class ModsImport(QtWidgets.QMainWindow):
 
     def saveModpack(self):
         if self.controller.save(require_resolved=True):
-            self.parent().gameList.refresh()
+            self.saved.emit()
             self.close()
 
     def showWindow(self):
